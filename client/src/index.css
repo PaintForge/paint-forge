@@ -91,9 +91,19 @@
 
 @layer components {
   .glass-morphism {
-    background: rgba(26, 26, 26, 0.85);
+    background: rgba(26, 26, 26, 0.95) !important;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 107, 53, 0.2);
+  }
+
+  /* Ensure Cards with glass-morphism get dark backgrounds */
+  .glass-morphism.bg-card {
+    background: rgba(26, 26, 26, 0.95) !important;
+  }
+  
+  /* Override any default card backgrounds */
+  .glass-morphism {
+    background-color: rgba(26, 26, 26, 0.95) !important;
   }
   
   .forge-glow {
