@@ -1,5 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getAuthToken } from "@/hooks/useAuth";
+
+// Move getAuthToken here to break circular dependency
+export function getAuthToken(): string | null {
+  return localStorage.getItem("authToken");
+}
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
