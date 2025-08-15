@@ -11,7 +11,7 @@ import { Link, useLocation } from "wouter";
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
-import { registerSchema } from "@shared/schema";
+import { registerSchema } from "../../../shared/schema";
 import { generateCaptcha, type CaptchaData } from "../lib/captcha";
 import type { z } from "zod";
 
