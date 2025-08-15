@@ -2,7 +2,7 @@
 
 🚨 **CRITICAL BUILD ERRORS FIXED** 🚨
 
-This package fixes TWO critical deployment issues:
+This package fixes THREE critical deployment issues:
 
 ## Issue #1: @ Alias Import Resolution ✅ FIXED
 - Error: `[vite]: Rollup failed to resolve import "@/components/ui/card"`
@@ -11,6 +11,10 @@ This package fixes TWO critical deployment issues:
 ## Issue #2: Build Command Configuration ✅ FIXED  
 - Error: `Cannot find package 'vite' imported from vite.config.js`
 - Fix: Corrected build command to run from client directory
+
+## Issue #3: Replit-Specific Dependencies ✅ FIXED
+- Error: `No matching version found for @replit/vite-plugin-cartographer`
+- Fix: Removed Replit-specific packages not available in npm registry
 
 ## Files to Replace on GitHub:
 
@@ -25,8 +29,8 @@ This package fixes TWO critical deployment issues:
 
 ## Deploy Instructions:
 
-1. **Download paint-forge-final-deployment-fix.zip**
+1. **Download paint-forge-production-ready.zip**
 2. **Replace ALL files in your GitHub repository** 
 3. **Render will automatically rebuild and succeed**
 
-⚡ These fixes resolve both the vite configuration and import resolution errors blocking your deployment.
+⚡ These fixes resolve the vite configuration, import resolution, and dependency errors blocking your deployment.
