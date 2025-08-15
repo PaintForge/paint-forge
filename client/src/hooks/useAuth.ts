@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, getAuthToken } from "../lib/queryClient";
+import { apiRequest } from "../lib/queryClient";
 
 interface User {
   id: number;
@@ -28,6 +28,10 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem("authToken");
 }
 
 export function setAuthToken(token: string): void {

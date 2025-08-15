@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "../ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { User, Menu, X, LogIn, UserPlus, LogOut, Settings, HelpCircle, Shield, MessageSquare } from "lucide-react";
-import { getAuthToken, removeAuthToken } from "@/hooks/useAuth";
-import { queryClient } from "@/lib/queryClient";
-import logoImage from "@assets/ChatGPT Image Jun 9, 2025, 11_03_05 AM_1749502486436.png";
+import { getAuthToken, removeAuthToken } from "../../hooks/useAuth";
+import { queryClient } from "../../lib/queryClient";
+// Logo is now in public directory and accessible at runtime
 
 interface User {
   id: number;
@@ -61,7 +61,7 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <img 
-              src={logoImage} 
+              src="/logo.png" 
               alt="The Paint Forge" 
               className="w-12 h-12 object-contain"
             />
