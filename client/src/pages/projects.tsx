@@ -6,12 +6,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Upload, Palette, Search, Filter, Camera, Image, X, Share2, Copy, Link, Download } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
+import { Label } from "../components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -19,14 +19,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "../components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from "../components/ui/dropdown-menu";
 import {
   Form,
   FormControl,
@@ -34,19 +34,19 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from "../components/ui/form";
 import { 
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { getAuthToken } from "@/hooks/useAuth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+} from "../components/ui/select";
+import { useToast } from "../hooks/use-toast";
+import { getAuthToken } from "../hooks/useAuth";
+import { apiRequest, queryClient } from "../lib/queryClient";
 
-import MiniatureDetail from "@/components/project/miniature-detail";
+import MiniatureDetail from "../components/project/miniature-detail";
 import type { Project, InsertProject } from "@shared/schema";
 
 const createProjectSchema = z.object({
