@@ -24,7 +24,16 @@ import { Footer } from "./components/Footer";
 
 function Router() {
   return (
-    <div className="min-h-screen bg-forge-dark text-forge-text flex flex-col">
+    <div 
+      className="min-h-screen bg-forge-dark text-forge-text flex flex-col"
+      style={{
+        backgroundImage: 'url("/metallic-background.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+        backgroundColor: '#1a1a1a'
+      }}
+    >
       <Header />
       <main className="flex-1 pb-20 md:pb-6">
         <Switch>
