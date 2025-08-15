@@ -35,7 +35,7 @@ import {
 } from "../ui/select";
 import { useToast } from "../../hooks/use-toast";
 import { apiRequest, queryClient } from "../../lib/queryClient";
-import type { Project, Paint } from "../../../../shared/schema";
+import type { Project, Paint } from "@shared/schema";
 
 const addPaintSchema = z.object({
   paintId: z.union([z.number().min(1), z.literal("custom")], {

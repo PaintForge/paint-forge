@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { getAuthToken } from "../hooks/useAuth";
 import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
-import { insertFeedbackSchema, type InsertFeedback, type Feedback } from "../../../shared/schema";
+import { insertFeedbackSchema, type InsertFeedback, type Feedback } from "@shared/schema";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";

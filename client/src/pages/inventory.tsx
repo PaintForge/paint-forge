@@ -15,7 +15,7 @@ import { queryClient, apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPaintSchema, type Paint } from "../../../shared/schema";
+import { insertPaintSchema, type Paint } from "@shared/schema";
 import { getAuthToken } from "../hooks/useAuth";
 import type { z } from "zod";
 
