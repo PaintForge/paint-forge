@@ -15,7 +15,7 @@ import {
   HelpCircle,
   Heart
 } from "lucide-react";
-import logoImage from "@assets/ChatGPT Image Jun 9, 2025, 11_03_05 AM_1749502486436.png";
+// Logo is now in public directory and accessible at runtime
 
 export default function Landing() {
   const features = [
@@ -52,7 +52,7 @@ export default function Landing() {
         <div className="container mx-auto text-center max-w-4xl">
           <div className="flex justify-center mb-8">
             <img 
-              src={logoImage} 
+              src="/logo.png" 
               alt="The Paint Forge" 
               className="h-96 w-96 object-contain filter brightness-110"
             />
