@@ -2,8 +2,9 @@
 export default {
   darkMode: ["class"],
   content: [
-    './src/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx,js,jsx}',
     './index.html',
+    './public/**/*.html',
   ],
   prefix: "",
   theme: {
