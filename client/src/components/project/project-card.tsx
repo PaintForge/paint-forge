@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Edit, Trash2, Calendar, Image, Palette } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { updateProjectSchema, type Project, type UpdateProject } from "../../../../shared/schema";
+import { updateProjectSchema, type Project, type UpdateProject } from "@shared/schema";
 import { apiRequest, queryClient } from "../../lib/queryClient";
 import { useToast } from "../../hooks/use-toast";
 import type { z } from "zod";
