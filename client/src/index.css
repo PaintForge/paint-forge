@@ -61,13 +61,11 @@
 
 @layer base {
   * {
-    @apply border-0;
+    @apply border-border;
   }
 
   body {
-    @apply font-sans antialiased;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
+    @apply font-sans antialiased bg-background text-foreground;
     background-image: url('/metallic-background.jpg');
     background-size: cover;
     background-position: center;
@@ -95,9 +93,19 @@
 
 @layer components {
   .glass-morphism {
-    background: rgba(26, 26, 26, 0.85);
+    background: rgba(26, 26, 26, 0.95) !important;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 107, 53, 0.2);
+  }
+
+  /* Ensure Cards with glass-morphism get dark backgrounds */
+  .glass-morphism.bg-card {
+    background: rgba(26, 26, 26, 0.95) !important;
+  }
+  
+  /* Override any default card backgrounds */
+  .glass-morphism {
+    background-color: rgba(26, 26, 26, 0.95) !important;
   }
   
   .forge-glow {
