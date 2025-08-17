@@ -61,17 +61,19 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   body {
-    @apply font-sans antialiased text-foreground;
-    background-color: #1a1a1a;
+    @apply font-sans antialiased bg-background text-foreground;
+    background-image: url('/metallic-background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
   }
 
   html {
     font-family: 'Inter', sans-serif;
-    background-color: #1a1a1a;
   }
 
   .font-cinzel {
@@ -91,9 +93,26 @@
 
 @layer components {
   .glass-morphism {
-    background: rgba(26, 26, 26, 0.85);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 107, 53, 0.2);
+    background: rgba(15, 15, 15, 0.98) !important;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 107, 53, 0.3);
+  }
+
+  /* Ensure Cards with glass-morphism get dark backgrounds */
+  .glass-morphism.bg-card {
+    background: rgba(15, 15, 15, 0.98) !important;
+  }
+  
+  /* Override any default card backgrounds */
+  .glass-morphism {
+    background-color: rgba(15, 15, 15, 0.98) !important;
+  }
+  
+  /* Specific styling for buttons with glass effect */
+  .button-glass-morphism {
+    background: rgba(15, 15, 15, 0.98) !important;
+    backdrop-filter: blur(15px) !important;
+    border: 1px solid rgba(255, 107, 53, 0.4) !important;
   }
   
   .forge-glow {

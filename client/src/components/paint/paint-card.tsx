@@ -11,7 +11,7 @@ import { MoreHorizontal, Edit, Trash2, Package, AlertTriangle, CheckCircle, Plus
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPaintSchema, type Paint } from "../../../../shared/schema";
+import { insertPaintSchema, type Paint } from "@shared/schema";
 import { apiRequest } from "../../lib/queryClient";
 import { queryClient } from "../../lib/queryClient";
 import { useToast } from "../../hooks/use-toast";

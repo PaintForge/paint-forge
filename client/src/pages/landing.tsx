@@ -71,7 +71,17 @@ export default function Landing() {
             </Link>
             
             <Link href="/login">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-orange-500/30 hover:bg-orange-500/10">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="text-lg px-8 py-6 border-orange-500/30 hover:bg-orange-500/10"
+                style={{ 
+                  backgroundColor: 'rgba(15, 15, 15, 0.98)',
+                  backdropFilter: 'blur(15px)',
+                  borderColor: 'rgba(255, 107, 53, 0.4)',
+                  border: '1px solid rgba(255, 107, 53, 0.4)'
+                }}
+              >
                 Already Have an Account?
               </Button>
             </Link>
