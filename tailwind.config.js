@@ -2,10 +2,11 @@
 export default {
   darkMode: ["class"],
   content: [
-    './client/src/**/*.{ts,tsx,js,jsx}',
-    './client/index.html',
-    './client/**/*.{ts,tsx,js,jsx}',
-    './src/**/*.{ts,tsx,js,jsx}',
+  './src/**/*.{ts,tsx,js,jsx}',
+  './index.html',
+  '../src/**/*.{ts,tsx,js,jsx}',
+  '../client/src/**/*.{ts,tsx,js,jsx}',
+],
     './index.html',
   ],
   prefix: "",
