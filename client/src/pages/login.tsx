@@ -11,7 +11,7 @@ import { Link, useLocation } from "wouter";
 import { Shield, Mail, Lock, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
-import { loginSchema } from "@shared/schema";
+import { loginSchema } from "../../../shared/schema";
 import type { z } from "zod";
 
 type LoginForm = z.infer<typeof loginSchema>;

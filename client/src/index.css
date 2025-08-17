@@ -61,21 +61,17 @@
 
 @layer base {
   * {
-    @apply border-0;
+    @apply border-border;
   }
 
   body {
-    @apply font-sans antialiased;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
-    background-image: url('/metallic-background.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
+    @apply font-sans antialiased text-foreground;
+    background-color: #1a1a1a;
   }
 
   html {
     font-family: 'Inter', sans-serif;
+    background-color: #1a1a1a;
   }
 
   .font-cinzel {

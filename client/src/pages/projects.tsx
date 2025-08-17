@@ -47,7 +47,7 @@ import { getAuthToken } from "../hooks/useAuth";
 import { apiRequest, queryClient } from "../lib/queryClient";
 
 import MiniatureDetail from "../components/project/miniature-detail";
-import type { Project, InsertProject } from "@shared/schema";
+import type { Project, InsertProject } from "../../../shared/schema";
 
 const createProjectSchema = z.object({
   name: z.string().min(1, "Miniature name is required"),
