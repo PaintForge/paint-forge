@@ -16,15 +16,23 @@ import PrivacyPolicy from "./pages/privacy-policy";
 import TermsOfService from "./pages/terms-of-service";
 import AdminDashboard from "./pages/admin";
 import FeedbackPage from "./pages/feedback";
-import { useAuthState } from "./hooks/useAuth";
 
 import Header from "./components/layout/header";
 import BottomNavigation from "./components/layout/bottom-navigation";
 import { Footer } from "./components/Footer";
+import metallicBackground from "/metallic-background.jpg";
 
 function Router() {
   return (
-    <div className="min-h-screen bg-forge-dark text-forge-text flex flex-col">
+    <div 
+      className="min-h-screen bg-forge-dark text-forge-text flex flex-col"
+      style={{
+        backgroundImage: `url(${metallicBackground})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       <Header />
       <main className="flex-1 pb-20 md:pb-6">
         <Switch>
