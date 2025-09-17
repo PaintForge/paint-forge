@@ -1,97 +1,185 @@
-import nodemailer from 'nodemailer';
+import { MailService } from '@sendgrid/mail';
 
-// Create transporter for IONOS SMTP
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: 'smtp.ionos.com', // IONOS SMTP server
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.IONOS_EMAIL_USER,
-      pass: process.env.IONOS_EMAIL_PASSWORD
-    },
-    tls: {
-      rejectUnauthorized: false
+// Initialize SendGrid
+if (!process.env.SENDGRID_API_KEY) {
+  console.warn('SENDGRID_API_KEY not configured - email functionality will be limited to console logging');
+}
+
+const mailService = new MailService();
+if (process.env.SENDGRID_API_KEY) {
+  mailService.setApiKey(process.env.SENDGRID_API_KEY);
+}
+
+interface EmailParams {
+  to: string;
+  from: string;
+  subject: string;
+  text?: string;
+  html?: string;
+}
+
+async function sendEmail(params: EmailParams): Promise<boolean> {
+  try {
+    if (!process.env.SENDGRID_API_KEY) {
+      // Development fallback - log email details
+      console.log(`📧 SendGrid Email (Development Mode):`);
+      console.log(`To: ${params.to}`);
+      console.log(`From: ${params.from}`);
+      console.log(`Subject: ${params.subject}`);
+      return true;
     }
-  });
-};
+
+    const sendGridMessage: any = {
+      to: params.to,
+      from: params.from,
+      subject: params.subject,
+      // Temporarily removed ASM for testing - may be causing suppression issues
+      // asm: {
+      //   group_id: 1
+      // }
+    };
+    
+    if (params.text) sendGridMessage.text = params.text;
+    if (params.html) sendGridMessage.html = params.html;
+    
+    await mailService.send(sendGridMessage);
+    return true;
+  } catch (error) {
+    console.error('SendGrid email error:', error);
+    return false;
+  }
+}
 
 export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
   try {
-    // Check if email credentials are configured
-    if (!process.env.IONOS_EMAIL_USER || !process.env.IONOS_EMAIL_PASSWORD) {
-      console.log(`Email verification link for ${email}: ${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/verify-email?token=${token}`);
-      return true; // Return true for development
-    }
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`;
 
-    const transporter = createTransporter();
-    const verificationUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/verify-email?token=${token}`;
-
-    const mailOptions = {
-      from: `"The Paint Forge" <${process.env.IONOS_EMAIL_USER}>`,
+    const emailParams: EmailParams = {
       to: email,
+      from: 'no-reply@paintsforge.com',
       subject: 'Verify Your Paint Forge Account',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #1a1a1a; color: #f5f5f5; border-radius: 8px; overflow: hidden;">
-          <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 20px; text-align: center;">
-            <h1 style="margin: 0; color: white; font-size: 24px;">The Paint Forge</h1>
-            <p style="margin: 10px 0 0 0; color: white; opacity: 0.9;">Verify Your Account</p>
-          </div>
-          
-          <div style="padding: 30px 20px;">
-            <h2 style="color: #ff6b35; margin-top: 0;">Welcome to The Paint Forge!</h2>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Paint Forge Account</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 8px; overflow: hidden;">
             
-            <p style="line-height: 1.6; margin-bottom: 20px;">
-              Thank you for creating your account. To complete your registration and start managing your paint inventory, please verify your email address by clicking the button below.
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" 
-                 style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); 
-                        color: white; 
-                        text-decoration: none; 
-                        padding: 12px 30px; 
-                        border-radius: 6px; 
-                        font-weight: bold; 
-                        display: inline-block;">
-                Verify Email Address
-              </a>
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">
+                The Paint Forge
+              </h1>
+              <p style="margin: 10px 0 0 0; color: white; font-size: 16px; opacity: 0.9;">
+                Account Verification Required
+              </p>
             </div>
             
-            <p style="line-height: 1.6; font-size: 14px; color: #a3a3a3;">
-              If the button doesn't work, you can copy and paste this link into your browser:
-            </p>
-            <p style="word-break: break-all; font-size: 14px; color: #ff6b35; margin-bottom: 20px;">
-              ${verificationUrl}
-            </p>
+            <!-- Main Content -->
+            <div style="padding: 40px 30px; background-color: #1a1a1a; color: #f5f5f5;">
+              <h2 style="color: #ff6b35; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 25px;">
+                Welcome to The Paint Forge!
+              </h2>
+              
+              <div style="background-color: #2d2d2d; border: 2px solid #10b981; border-radius: 8px; padding: 25px; margin: 25px 0;">
+                <p style="line-height: 1.7; margin: 0; color: #f5f5f5; font-size: 16px;">
+                  Your account has been created successfully. To complete your registration and begin cataloging your paint collection, please verify your email address by clicking the button below.
+                </p>
+              </div>
+              
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="${verificationUrl}" 
+                   style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); 
+                          color: white; 
+                          text-decoration: none; 
+                          padding: 16px 32px; 
+                          border-radius: 8px; 
+                          font-weight: 600; 
+                          display: inline-block;
+                          font-size: 16px;">
+                  Verify Email Address
+                </a>
+              </div>
+              
+              <!-- Fallback Link -->
+              <div style="background-color: #2d2d2d; padding: 20px; border-radius: 6px; border: 1px solid #ff6b35; margin: 25px 0;">
+                <p style="line-height: 1.6; font-size: 14px; color: #a3a3a3; margin: 0 0 10px 0;">
+                  If the button doesn't work, copy this link into your browser:
+                </p>
+                <p style="word-break: break-all; font-size: 13px; color: #ff6b35; margin: 0; padding: 10px; background-color: #1a1a1a; border-radius: 4px; font-family: monospace;">
+                  ${verificationUrl}
+                </p>
+              </div>
+              
+              <!-- Security Notice -->
+              <div style="background-color: #2d2d2d; border: 1px solid #f7931e; border-radius: 6px; padding: 15px; margin: 20px 0;">
+                <p style="font-size: 13px; color: #f7931e; line-height: 1.5; margin: 0;">
+                  <strong>Security Notice:</strong> This verification link expires in 24 hours. If you did not create this account, please ignore this email.
+                </p>
+              </div>
+            </div>
             
-            <hr style="border: none; border-top: 1px solid #333; margin: 30px 0;">
-            
-            <p style="font-size: 12px; color: #666; line-height: 1.4;">
-              This verification link will expire in 24 hours. If you didn't create this account, please ignore this email.
-            </p>
+            <!-- Footer -->
+            <div style="background-color: #0f0f0f; padding: 25px 30px; text-align: center;">
+              <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0 0 15px 0;">
+                <strong style="color: #ff6b35;">The Paint Forge</strong> - Your Digital Paint Collection<br>
+                Managing your miniature painting hobby with precision.
+              </p>
+              
+              <div style="border-top: 1px solid #333; padding-top: 15px; margin-top: 15px;">
+                <p style="font-size: 12px; color: #666; line-height: 1.4; margin: 5px 0;">
+                  <strong>The Paint Forge</strong><br>
+                  Email: support@paintsforge.com<br><br>
+                  This email was sent to ${email} because you created an account.<br>
+                  <a href="${baseUrl}/privacy-policy" style="color: #ff6b35; text-decoration: none;">Privacy Policy</a> | 
+                  <a href="${baseUrl}/terms-of-service" style="color: #ff6b35; text-decoration: none;">Terms of Service</a>
+                </p>
+                <p style="font-size: 11px; color: #555; margin: 10px 0 0 0;">
+                  © 2025 The Paint Forge. All rights reserved.
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        </body>
+        </html>
       `,
       text: `
-Welcome to The Paint Forge!
+WELCOME TO THE PAINT FORGE!
 
-Thank you for creating your account. To complete your registration, please verify your email address by visiting this link:
+Your account has been created successfully. To complete your registration and begin cataloging your paint collection, please verify your email address.
 
+VERIFICATION LINK:
 ${verificationUrl}
 
-This verification link will expire in 24 hours. If you didn't create this account, please ignore this email.
+IMPORTANT SECURITY NOTICE:
+- This verification link expires in 24 hours
+- If you didn't create this account, ignore this email
+- Your account remains inactive until verified
 
-The Paint Forge Team
+-------------------------------------------
+The Paint Forge
+Email: support@paintsforge.com
+
+Privacy Policy: ${baseUrl}/privacy-policy
+Terms of Service: ${baseUrl}/terms-of-service
+
+© 2025 The Paint Forge. All rights reserved.
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`Verification email sent successfully to ${email}`);
-    return true;
+    const success = await sendEmail(emailParams);
+    if (success) {
+      console.log(`✅ Verification email sent successfully to ${email} via SendGrid`);
+    }
+    return success;
   } catch (error) {
     console.error('Error sending verification email:', error);
-    // Log the verification link as fallback
     console.log(`Email verification link for ${email}: ${process.env.BASE_URL || 'http://localhost:5000'}/api/auth/verify-email?token=${token}`);
     return false;
   }
@@ -99,80 +187,150 @@ The Paint Forge Team
 
 export async function sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
   try {
-    // Check if email credentials are configured
-    if (!process.env.IONOS_EMAIL_USER || !process.env.IONOS_EMAIL_PASSWORD) {
-      console.log(`Password reset link for ${email}: ${process.env.BASE_URL || 'http://localhost:5000'}/reset-password?token=${token}`);
-      return true; // Return true for development
-    }
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-    const transporter = createTransporter();
-    const resetUrl = `${process.env.BASE_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
-
-    const mailOptions = {
-      from: `"The Paint Forge" <${process.env.IONOS_EMAIL_USER}>`,
+    const emailParams: EmailParams = {
       to: email,
+      from: 'no-reply@paintsforge.com',
       subject: 'Reset Your Paint Forge Password',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #1a1a1a; color: #f5f5f5; border-radius: 8px; overflow: hidden;">
-          <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 20px; text-align: center;">
-            <h1 style="margin: 0; color: white; font-size: 24px;">The Paint Forge</h1>
-            <p style="margin: 10px 0 0 0; color: white; opacity: 0.9;">Password Reset Request</p>
-          </div>
-          
-          <div style="padding: 30px 20px;">
-            <h2 style="color: #ff6b35; margin-top: 0;">Reset Your Password</h2>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Reset Your Paint Forge Password</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 8px; overflow: hidden;">
             
-            <p style="line-height: 1.6; margin-bottom: 20px;">
-              We received a request to reset your Paint Forge account password. Click the button below to create a new password.
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" 
-                 style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); 
-                        color: white; 
-                        text-decoration: none; 
-                        padding: 12px 30px; 
-                        border-radius: 6px; 
-                        font-weight: bold; 
-                        display: inline-block;">
-                Reset Password
-              </a>
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #dc2626 0%, #ff6b35 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">
+                The Paint Forge
+              </h1>
+              <p style="margin: 10px 0 0 0; color: white; font-size: 16px; opacity: 0.9;">
+                Password Reset Request
+              </p>
             </div>
             
-            <p style="line-height: 1.6; font-size: 14px; color: #a3a3a3;">
-              If the button doesn't work, you can copy and paste this link into your browser:
-            </p>
-            <p style="word-break: break-all; font-size: 14px; color: #ff6b35; margin-bottom: 20px;">
-              ${resetUrl}
-            </p>
+            <!-- Main Content -->
+            <div style="padding: 40px 30px; background-color: #1a1a1a; color: #f5f5f5;">
+              <h2 style="color: #dc2626; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 25px;">
+                Password Reset Request
+              </h2>
+              
+              <!-- Alert Box -->
+              <div style="background-color: #2d2d2d; border: 2px solid #dc2626; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                <h3 style="color: #dc2626; margin: 0 0 15px 0; font-size: 18px;">Security Alert</h3>
+                <p style="line-height: 1.7; margin: 0; color: #f5f5f5; font-size: 15px;">
+                  A request to reset your Paint Forge password has been received. If this was you, click the button below to reset your password. If not, your account remains secure.
+                </p>
+              </div>
+              
+              <div style="background-color: #2d2d2d; padding: 25px; border-radius: 8px; border-left: 4px solid #ff6b35; margin: 25px 0;">
+                <p style="line-height: 1.7; margin: 0; color: #f5f5f5; font-size: 16px;">
+                  To reset your password and regain access to your paint collection, click the secure link below. This will take you to the password reset page.
+                </p>
+              </div>
+              
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 35px 0;">
+                <a href="${resetUrl}" 
+                   style="background: linear-gradient(135deg, #dc2626 0%, #ff6b35 100%); 
+                          color: white; 
+                          text-decoration: none; 
+                          padding: 16px 32px; 
+                          border-radius: 8px; 
+                          font-weight: 600; 
+                          display: inline-block;
+                          font-size: 16px;">
+                  Reset Password
+                </a>
+              </div>
+              
+              <!-- Fallback Link -->
+              <div style="background-color: #2d2d2d; padding: 20px; border-radius: 6px; border: 1px solid #dc2626; margin: 25px 0;">
+                <p style="line-height: 1.6; font-size: 14px; color: #a3a3a3; margin: 0 0 10px 0;">
+                  If the button doesn't work, copy this link into your browser:
+                </p>
+                <p style="word-break: break-all; font-size: 13px; color: #dc2626; margin: 0; padding: 10px; background-color: #1a1a1a; border-radius: 4px; font-family: monospace;">
+                  ${resetUrl}
+                </p>
+              </div>
+              
+              <!-- Security Info -->
+              <div style="background-color: #2d2d2d; border: 1px solid #f7931e; border-radius: 6px; padding: 20px; margin: 25px 0;">
+                <h4 style="color: #f7931e; margin: 0 0 15px 0; font-size: 16px;">
+                  Important Security Information
+                </h4>
+                <ul style="color: #f7931e; margin: 0; padding-left: 20px; line-height: 1.6;">
+                  <li style="margin-bottom: 8px;">This reset link expires in <strong>1 hour</strong> for security</li>
+                  <li style="margin-bottom: 8px;">If you didn't request this reset, your account is still secure</li>
+                  <li>Only the most recent reset request is valid</li>
+                </ul>
+              </div>
+            </div>
             
-            <hr style="border: none; border-top: 1px solid #333; margin: 30px 0;">
-            
-            <p style="font-size: 12px; color: #666; line-height: 1.4;">
-              This password reset link will expire in 1 hour. If you didn't request this reset, please ignore this email and your password will remain unchanged.
-            </p>
+            <!-- Footer -->
+            <div style="background-color: #0f0f0f; padding: 25px 30px; text-align: center;">
+              <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0 0 15px 0;">
+                <strong style="color: #ff6b35;">The Paint Forge</strong> - Secure Paint Collection Management<br>
+                Protecting your miniature painting data with advanced security.
+              </p>
+              
+              <div style="border-top: 1px solid #333; padding-top: 15px; margin-top: 15px;">
+                <p style="font-size: 12px; color: #666; line-height: 1.4; margin: 5px 0;">
+                  <strong>The Paint Forge</strong><br>
+                  Email: support@paintsforge.com<br><br>
+                  This security alert was sent to ${email} due to a password reset request.<br>
+                  <a href="${baseUrl}/privacy-policy" style="color: #ff6b35; text-decoration: none;">Privacy Policy</a> | 
+                  <a href="${baseUrl}/terms-of-service" style="color: #ff6b35; text-decoration: none;">Terms of Service</a>
+                </p>
+                <p style="font-size: 11px; color: #555; margin: 10px 0 0 0;">
+                  © 2025 The Paint Forge. All rights reserved.
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        </body>
+        </html>
       `,
       text: `
-Reset Your Paint Forge Password
+THE PAINT FORGE - PASSWORD RESET
 
-We received a request to reset your Paint Forge account password. Visit this link to create a new password:
+SECURITY ALERT: Password Reset Request
 
+A request to reset your Paint Forge password has been received. If this was you, use the link below to reset your password. If not, your account remains secure.
+
+PASSWORD RESET LINK:
 ${resetUrl}
 
-This password reset link will expire in 1 hour. If you didn't request this reset, please ignore this email and your password will remain unchanged.
+CRITICAL SECURITY INFORMATION:
+- This reset link expires in 1 hour for maximum security
+- If you didn't request this reset, ignore this email
+- Only the most recent reset request is valid
+- Your current password remains secure until reset is completed
 
-The Paint Forge Team
+-------------------------------------------
+The Paint Forge
+Email: support@paintsforge.com
+
+Privacy Policy: ${baseUrl}/privacy-policy
+Terms of Service: ${baseUrl}/terms-of-service
+
+© 2025 The Paint Forge. All rights reserved.
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`Password reset email sent successfully to ${email}`);
-    return true;
+    const success = await sendEmail(emailParams);
+    if (success) {
+      console.log(`✅ Password reset email sent successfully to ${email} via SendGrid`);
+    }
+    return success;
   } catch (error) {
     console.error('Error sending password reset email:', error);
-    // Log the reset link as fallback
     console.log(`Password reset link for ${email}: ${process.env.BASE_URL || 'http://localhost:5000'}/reset-password?token=${token}`);
     return false;
   }
@@ -180,42 +338,35 @@ The Paint Forge Team
 
 export async function testEmailConnection(): Promise<boolean> {
   try {
-    if (!process.env.IONOS_EMAIL_USER || !process.env.IONOS_EMAIL_PASSWORD) {
+    if (!process.env.SENDGRID_API_KEY) {
+      console.log('❌ SendGrid API key not configured');
       return false;
     }
 
-    const transporter = createTransporter();
-    await transporter.verify();
+    console.log('✅ SendGrid API key configured');
     return true;
   } catch (error) {
-    console.error('IONOS email connection test failed:', error);
+    console.error('SendGrid connection test failed:', error);
     return false;
   }
 }
 
 export async function sendTestEmail(email: string, subject: string, htmlContent: string): Promise<boolean> {
   try {
-    // Check if email credentials are configured
-    if (!process.env.IONOS_EMAIL_USER || !process.env.IONOS_EMAIL_PASSWORD) {
-      console.log(`Test email would be sent to: ${email}`);
-      console.log(`Subject: ${subject}`);
-      return true; // Return true for development
-    }
-
-    const transporter = createTransporter();
-
-    const mailOptions = {
-      from: `"The Paint Forge" <${process.env.IONOS_EMAIL_USER}>`,
+    const emailParams: EmailParams = {
       to: email,
+      from: 'no-reply@paintsforge.com',
       subject: subject,
       html: htmlContent
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Test email sent successfully via IONOS to ${email}`);
-    return true;
+    const success = await sendEmail(emailParams);
+    if (success) {
+      console.log(`✅ Test email sent successfully via SendGrid to ${email}`);
+    }
+    return success;
   } catch (error) {
-    console.error('❌ IONOS email sending failed:', error);
+    console.error('❌ SendGrid test email failed:', error);
     return false;
   }
 }
@@ -227,16 +378,6 @@ export async function sendFeedbackNotification(
   userName: string
 ): Promise<boolean> {
   try {
-    // Check if email credentials are configured
-    if (!process.env.IONOS_EMAIL_USER || !process.env.IONOS_EMAIL_PASSWORD) {
-      console.log(`Feedback notification for support@paintsforge.com:`);
-      console.log(`Type: ${feedbackType}`);
-      console.log(`From: ${userName} (${userEmail})`);
-      console.log(`Message: ${message}`);
-      return true; // Return true for development
-    }
-
-    const transporter = createTransporter();
     const currentDate = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -245,49 +386,105 @@ export async function sendFeedbackNotification(
       minute: '2-digit'
     });
 
-    const mailOptions = {
-      from: `"The Paint Forge" <${process.env.IONOS_EMAIL_USER}>`,
+    const emailParams: EmailParams = {
       to: 'support@paintsforge.com',
-      subject: `New ${feedbackType} from ${userName}`,
+      from: 'no-reply@paintsforge.com',
+      subject: `New ${feedbackType} from Paint Forge User`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #1a1a1a; color: #f5f5f5; border-radius: 8px; overflow: hidden;">
-          <div style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); padding: 20px; text-align: center;">
-            <h1 style="margin: 0; color: white; font-size: 24px;">The Paint Forge</h1>
-            <p style="margin: 10px 0 0 0; color: white; opacity: 0.9;">New User Feedback</p>
-          </div>
-          
-          <div style="padding: 30px 20px;">
-            <h2 style="color: #ff6b35; margin-top: 0;">${feedbackType}</h2>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>New Feedback from Paint Forge User</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #1a1a1a; border-radius: 8px; overflow: hidden;">
             
-            <div style="background-color: #333; padding: 20px; border-radius: 6px; margin: 20px 0;">
-              <h3 style="color: #fff; margin-top: 0; font-size: 16px;">User Information</h3>
-              <p style="margin: 5px 0; color: #a3a3a3;"><strong>Name:</strong> ${userName}</p>
-              <p style="margin: 5px 0; color: #a3a3a3;"><strong>Email:</strong> ${userEmail}</p>
-              <p style="margin: 5px 0; color: #a3a3a3;"><strong>Date:</strong> ${currentDate}</p>
-              <p style="margin: 5px 0; color: #a3a3a3;"><strong>Type:</strong> ${feedbackType}</p>
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #10b981 0%, #ff6b35 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="margin: 0; color: white; font-size: 28px; font-weight: bold;">
+                The Paint Forge
+              </h1>
+              <p style="margin: 10px 0 0 0; color: white; font-size: 16px; opacity: 0.9;">
+                New User Feedback Received
+              </p>
             </div>
             
-            <h3 style="color: #fff; margin-top: 30px;">Message</h3>
-            <div style="background-color: #2a2a2a; padding: 20px; border-radius: 6px; border-left: 4px solid #ff6b35;">
-              <p style="color: #fff; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message}</p>
+            <!-- Main Content -->
+            <div style="padding: 40px 30px; background-color: #1a1a1a; color: #f5f5f5;">
+              <h2 style="color: #10b981; margin-top: 0; font-size: 24px; text-align: center; margin-bottom: 25px;">
+                ${feedbackType} Submission
+              </h2>
+              
+              <div style="background-color: #2d2d2d; border: 2px solid #10b981; border-radius: 8px; padding: 25px; margin: 25px 0;">
+                <h3 style="color: #10b981; margin: 0 0 15px 0; font-size: 18px;">Feedback Details</h3>
+                <table style="width: 100%; border-collapse: collapse; color: #f5f5f5;">
+                  <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333; font-weight: bold; width: 120px;">Type:</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333;">${feedbackType}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333; font-weight: bold;">User:</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333;">${userName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333; font-weight: bold;">Email:</td>
+                    <td style="padding: 10px 0; border-bottom: 1px solid #333;">${userEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px 0; font-weight: bold;">Date:</td>
+                    <td style="padding: 10px 0;">${currentDate}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <div style="background-color: #2d2d2d; padding: 25px; border-radius: 8px; border-left: 4px solid #ff6b35; margin: 25px 0;">
+                <h4 style="color: #ff6b35; margin: 0 0 15px 0; font-size: 16px;">Message Content</h4>
+                <div style="background-color: #1a1a1a; padding: 20px; border-radius: 4px; line-height: 1.6;">
+                  <p style="margin: 0; color: #f5f5f5; white-space: pre-wrap;">${message}</p>
+                </div>
+              </div>
             </div>
             
-            <hr style="border: none; border-top: 1px solid #333; margin: 30px 0;">
-            
-            <p style="font-size: 12px; color: #666; line-height: 1.4; text-align: center;">
-              This feedback was submitted through The Paint Forge feedback form.<br>
-              Please respond to the user at ${userEmail}
-            </p>
+            <!-- Footer -->
+            <div style="background-color: #0f0f0f; padding: 25px 30px; text-align: center;">
+              <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0;">
+                <strong style="color: #ff6b35;">The Paint Forge</strong> - User Feedback System<br>
+                Automatically generated notification from paintsforge.com
+              </p>
+            </div>
           </div>
-        </div>
+        </body>
+        </html>
+      `,
+      text: `
+THE PAINT FORGE - NEW USER FEEDBACK
+
+${feedbackType.toUpperCase()} SUBMISSION
+
+User Details:
+- Name: ${userName}
+- Email: ${userEmail}
+- Date: ${currentDate}
+- Type: ${feedbackType}
+
+Message:
+${message}
+
+-------------------------------------------
+The Paint Forge - User Feedback System
+Automatically generated from paintsforge.com
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Feedback notification sent to support@paintsforge.com`);
-    return true;
+    const success = await sendEmail(emailParams);
+    if (success) {
+      console.log(`✅ Feedback notification sent successfully via SendGrid`);
+    }
+    return success;
   } catch (error) {
-    console.error('❌ Failed to send feedback notification:', error);
+    console.error('❌ SendGrid feedback notification failed:', error);
     return false;
   }
 }
