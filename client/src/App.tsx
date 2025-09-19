@@ -21,8 +21,14 @@ import Header from "./components/layout/header";
 import BottomNavigation from "./components/layout/bottom-navigation";
 import { Footer } from "./components/Footer";
 import metallicBackground from "/metallic-background.jpg";
+import { useEffect } from "react";
+import { initGA } from "./lib/analytics";
+import { useAnalytics } from "./hooks/use-analytics";
 
 function Router() {
+  // Track page views when routes change
+  useAnalytics();
+  
   return (
     <div 
       className="min-h-screen bg-forge-dark text-forge-text flex flex-col"
@@ -57,6 +63,16 @@ function Router() {
 }
 
 function App() {
+  // Initialize Google Analytics when app loads
+  useEffect(() => {
+    // Verify required environment variable is present
+    if (!import.meta.env.VITE_GA_MEASUREMENT_ID) {
+      console.warn('Missing required Google Analytics key: VITE_GA_MEASUREMENT_ID');
+    } else {
+      initGA();
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
