@@ -494,7 +494,7 @@ export default function Profile() {
                         <Input
                           type="password"
                           placeholder="Enter your current password"
-                          className="bg-background/50 text-black placeholder:text-gray-500"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
@@ -513,7 +513,7 @@ export default function Profile() {
                         <Input
                           type="password"
                           placeholder="Enter your new password"
-                          className="bg-background/50 text-black placeholder:text-gray-500"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
@@ -532,7 +532,7 @@ export default function Profile() {
                         <Input
                           type="password"
                           placeholder="Confirm your new password"
-                          className="bg-background/50 text-black placeholder:text-gray-500"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
