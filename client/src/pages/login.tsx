@@ -112,7 +112,7 @@ export default function Login() {
                         <Input
                           type="email"
                           placeholder="john@email.com"
-                          className="bg-background/50 placeholder:text-gray-400 placeholder:no-shadow"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
@@ -135,7 +135,7 @@ export default function Login() {
                           <Input
                             type={showPassword ? "text" : "password"}
                             placeholder="At least 8 characters"
-                            className="bg-background/50 pr-10 placeholder:text-gray-400 password-field"
+                            className="bg-white text-black pr-10 placeholder:text-gray-400 password-field"
                             {...field}
                           />
                           <button
