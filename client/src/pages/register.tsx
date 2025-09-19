@@ -188,7 +188,7 @@ export default function Register() {
                         <Input
                           type="email"
                           placeholder="john@example.com"
-                          className="bg-background/50 text-black placeholder:text-gray-500"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
@@ -211,7 +211,7 @@ export default function Register() {
                           <Input
                             type={showPassword ? "text" : "password"}
                             placeholder="At least 8 characters"
-                            className="bg-background/50 text-black pr-10 placeholder:text-muted-foreground"
+                            className="bg-white text-black pr-10 placeholder:text-gray-400"
                             style={{ color: '#000000' }}
                             {...field}
                           />
@@ -262,7 +262,7 @@ export default function Register() {
                         <Input
                           type="number"
                           placeholder="Enter your answer"
-                          className="bg-background/50 text-black placeholder:text-gray-500"
+                          className="bg-white text-black placeholder:text-gray-400"
                           {...field}
                         />
                       </FormControl>
