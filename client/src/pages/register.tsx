@@ -38,25 +38,29 @@ export default function Register() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterForm) => {
-      // Add captcha validation to the request
+      // Validate captcha on client side first
+      const userAnswer = parseInt(data.captchaAnswer);
+      if (userAnswer !== captcha.answer) {
+        throw new Error("Incorrect captcha answer. Please try again.");
+      }
+      
+      // Send only the answer as string (matching schema)
       const requestData = {
-       const registerMutation = useMutation({
-  mutationFn: async (data: RegisterForm) => {
-    // Validate captcha on client side first
-    const userAnswer = parseInt(data.captchaAnswer);
-    if (userAnswer !== captcha.answer) {
-      throw new Error("Incorrect captcha answer. Please try again.");
-    }
-    
-    // Send only the answer as string (matching schema)
-    const requestData = {
-      ...data,
-      captchaAnswer: data.captchaAnswer, // Keep as string
-      captchaExpectedAnswer: captcha.answer,
-    };
-    const response = await apiRequest("POST", "/api/auth/register", requestData);
-    return response.json();
-  },
+        ...data,
+        captchaAnswer: data.captchaAnswer, // Keep as string
+        captchaExpectedAnswer: captcha.answer,
+      };
+      const response = await apiRequest("POST", "/api/auth/register", requestData);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setSuccess(data.message);
+      setError("");
+      form.reset();
+      setCaptcha(generateCaptcha()); // Generate new captcha
+      
+      toast({
+        title: "Account created!",
         description: "Please check your email to verify your account.",
       });
     },
@@ -66,15 +70,17 @@ export default function Register() {
       
       if (error.message) {
         const errorText = error.message.toLowerCase();
-        if (errorText.includes("email already exists") || errorText.includes("409")) {
+        if (errorText.includes("incorrect captcha") || errorText.includes("invalid captcha")) {
+          userMessage = "Incorrect captcha answer. Please try again.";
+        } else if (errorText.includes("email already exists") || errorText.includes("409")) {
           userMessage = "An account with this email already exists. Please try logging in instead.";
         } else if (errorText.includes("invalid email")) {
           userMessage = "Please enter a valid email address.";
         } else if (errorText.includes("password") && errorText.includes("weak")) {
           userMessage = "Password is too weak. Please choose a stronger password.";
         } else if (errorText.includes("network") || errorText.includes("fetch")) {
-          if (errorText.includes("incorrect captcha") || errorText.includes("invalid captcha")) {
-  userMessage = "Incorrect captcha answer. Please try again.";
+          userMessage = "Connection error. Please check your internet connection and try again.";
+        } else if (errorText.includes("server") || errorText.includes("500")) {
           userMessage = "Server error. Please try again in a few moments.";
         }
       }
