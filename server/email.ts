@@ -8,6 +8,9 @@ if (!process.env.SENDGRID_API_KEY) {
 const mailService = new MailService();
 if (process.env.SENDGRID_API_KEY) {
   mailService.setApiKey(process.env.SENDGRID_API_KEY);
+  
+  // Set connection timeout for production
+  mailService.setTimeout(15000); // 15 second timeout for all requests
 }
 
 interface EmailParams {
@@ -42,10 +45,10 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     if (params.text) sendGridMessage.text = params.text;
     if (params.html) sendGridMessage.html = params.html;
     
-    // Add timeout to prevent hanging
+    // Add timeout to prevent hanging  
     const sendPromise = mailService.send(sendGridMessage);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('SendGrid timeout after 10 seconds')), 10000)
+      setTimeout(() => reject(new Error('SendGrid timeout after 8 seconds')), 8000)
     );
     
     await Promise.race([sendPromise, timeoutPromise]);
@@ -446,23 +449,23 @@ export async function sendFeedbackNotification(
                   </div>
                 </div>
                 
-                <!-- Feedback Message Content -->
-                <div style="background: rgba(26, 26, 26, 0.9); border: 2px solid rgba(5, 150, 105, 0.3); border-radius: 10px; padding: 25px; margin: 25px 0; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                <!-- Message Content -->
+                <div style="background: rgba(45, 45, 45, 0.8); border: 2px solid rgba(5, 150, 105, 0.3); border-radius: 10px; padding: 30px; margin: 25px 0; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
                   <h3 style="color: #10b981; margin: 0 0 20px 0; font-family: 'Cinzel', serif; font-size: 20px; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); display: flex; align-items: center;">
                     📜 Transmission Content
                   </h3>
-                  <div style="background: rgba(15, 15, 15, 0.8); border-radius: 8px; padding: 20px; border-left: 4px solid #ff6b35;">
+                  <div style="background: rgba(26, 26, 26, 0.9); padding: 20px; border-radius: 8px; border-left: 4px solid #ff6b35;">
                     <p style="color: #f3f4f6; line-height: 1.8; margin: 0; font-size: 16px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); white-space: pre-wrap;">${message}</p>
                   </div>
                 </div>
                 
-                <!-- Action Required Section -->
-                <div style="background: rgba(184, 134, 11, 0.15); border: 2px solid rgba(184, 134, 11, 0.4); border-radius: 10px; padding: 25px; margin: 25px 0; text-align: center;">
-                  <h3 style="color: #fbbf24; margin: 0 0 15px 0; font-family: 'Cinzel', serif; font-size: 18px; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);">
-                    ⚡ Command & Control Directive
-                  </h3>
+                <!-- Response Protocol -->
+                <div style="background: rgba(184, 134, 11, 0.15); border: 1px solid rgba(184, 134, 11, 0.4); border-radius: 8px; padding: 25px; margin: 25px 0;">
+                  <h4 style="color: #fbbf24; margin: 0 0 15px 0; font-family: 'Cinzel', serif; font-size: 18px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                    📨 Response Protocol Required
+                  </h4>
                   <p style="color: #fbbf24; margin: 0; line-height: 1.6; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
-                    Review the transmission content above and respond via standard communication protocols. This Battle-Brother requires attention to their ${feedbackType.toLowerCase()}.
+                    Battle-Brother awaits acknowledgment and guidance from Command. Initiate response protocol via direct communication channel: <strong>${userEmail}</strong>
                   </p>
                 </div>
                 
@@ -476,7 +479,7 @@ export async function sendFeedbackNotification(
               <div style="margin-bottom: 15px;">
                 <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
                   <strong style="color: #ff6b35;">The Paint Forge</strong> - Command & Communication Center<br>
-                  Facilitating secure communications between Battle-Brothers and Command.
+                  Secure transmission relay from Battle-Brother ${userName} via digital vox-channel.
                 </p>
               </div>
               
@@ -486,13 +489,11 @@ export async function sendFeedbackNotification(
                   1234 Miniature Way, Suite 567<br>
                   Battle Creek, MI 49037, USA<br>
                   Email: support@paintsforge.com | Phone: (555) 123-PAINT<br><br>
-                  This communication was relayed from ${userEmail} at Battle-Brother ${userName}'s request.<br>
-                  <a href="<%asm_group_unsubscribe_raw_url%>" style="color: #ff6b35; text-decoration: none;">Unsubscribe</a> | 
-                  <a href="${process.env.BASE_URL || 'https://paintsforge.com'}/privacy-policy" style="color: #ff6b35; text-decoration: none;">Privacy Policy</a> | 
-                  <a href="${process.env.BASE_URL || 'https://paintsforge.com'}/terms-of-service" style="color: #ff6b35; text-decoration: none;">Terms of Service</a>
+                  This communication was transmitted from ${userEmail} via secure forge-channel.<br>
+                  Battle-Brothers may request communication cessation via command protocols.
                 </p>
                 <p style="font-size: 11px; color: #555; margin: 10px 0 0 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
-                  © 2025 The Paint Forge LLC. All rights reserved. | CAN-SPAM Act Compliant
+                  © 2025 The Paint Forge LLC. All communications secured. | CAN-SPAM Act Compliant
                 </p>
               </div>
             </div>
@@ -501,22 +502,21 @@ export async function sendFeedbackNotification(
         </html>
       `,
       text: `
-📡 THE PAINT FORGE - COMMAND & COMMUNICATION CENTER 📬
+📡 THE PAINT FORGE - COMMUNICATION CENTER 📬
 
 📨 INCOMING TRANSMISSION FROM BATTLE-BROTHER
 
-MESSAGE CLASSIFICATION: ${feedbackType}
-
-SENDER INTELLIGENCE:
+Transmission Details:
 - Call Sign: ${userName}
 - Comm Frequency: ${userEmail}
 - Transmission Time: ${currentDate}
+- Report Classification: ${feedbackType}
 
-TRANSMISSION CONTENT:
+Message Content:
 ${message}
 
-COMMAND DIRECTIVE:
-Review the transmission content above and respond via standard communication protocols. This Battle-Brother requires attention to their ${feedbackType.toLowerCase()}.
+Response Protocol Required:
+Battle-Brother awaits acknowledgment and guidance from Command. Initiate response protocol via direct communication channel: ${userEmail}
 
 -------------------------------------------
 The Paint Forge LLC
@@ -525,12 +525,6 @@ Battle Creek, MI 49037, USA
 Email: support@paintsforge.com
 Phone: (555) 123-PAINT
 
-This communication was relayed from ${userEmail} at Battle-Brother ${userName}'s request.
-
-Privacy Policy: ${process.env.BASE_URL || 'https://paintsforge.com'}/privacy-policy
-Terms of Service: ${process.env.BASE_URL || 'https://paintsforge.com'}/terms-of-service
-Unsubscribe: <%asm_group_unsubscribe_raw_url%>
-
 © 2025 The Paint Forge LLC - CAN-SPAM Act Compliant
 Secure communications by the Emperor's finest.
       `
@@ -538,11 +532,11 @@ Secure communications by the Emperor's finest.
 
     const success = await sendEmail(emailParams);
     if (success) {
-      console.log(`✅ Feedback notification email sent successfully to support@paintsforge.com`);
+      console.log(`✅ Feedback notification sent successfully to support@paintsforge.com via SendGrid`);
     }
     return success;
   } catch (error) {
-    console.error('Error sending feedback notification email:', error);
+    console.error('Error sending feedback notification:', error);
     return false;
   }
 }
