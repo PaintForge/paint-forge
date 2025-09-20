@@ -20,6 +20,10 @@ export async function apiRequest(
     throw new Error('401: Authentication required');
   }
   
+  // Use API base URL from environment or default to relative paths for development
+  const apiBase = import.meta.env.VITE_API_BASE || "";
+  const fullUrl = url.startsWith('http') ? url : `${apiBase}${url}`;
+  
   const headers: Record<string, string> = {};
   
   if (data) {
@@ -30,7 +34,7 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
+  const res = await fetch(fullUrl, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
@@ -58,13 +62,17 @@ export const getQueryFn: <T>(options: {
       throw new Error('401: Authentication required');
     }
     
+    // Use API base URL from environment or default to relative paths for development
+    const apiBase = import.meta.env.VITE_API_BASE || "";
+    const fullUrl = url.startsWith('http') ? url : `${apiBase}${url}`;
+    
     const headers: Record<string, string> = {};
     
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const res = await fetch(url, {
+    const res = await fetch(fullUrl, {
       headers,
       credentials: "include",
     });
