@@ -68,9 +68,9 @@ export function generateVerificationToken(): string {
   return crypto.randomUUID();
 }
 
-export async function sendVerificationEmail(email: string, token: string): Promise<void> {
+export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
   const { sendVerificationEmail: sendEmail } = await import('./email');
-  await sendEmail(email, token);
+  return await sendEmail(email, token);
 }
 
 export async function sendEmailChangeVerification(email: string, token: string): Promise<void> {
