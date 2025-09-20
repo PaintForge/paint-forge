@@ -54,17 +54,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate captcha
       const { captchaAnswer, captchaExpectedAnswer } = req.body;
-      if (!captchaAnswer || !captchaExpectedAnswer || parseInt(captchaAnswer) !== captchaExpectedAnswer) {
-       // Validate captcha
-const { captchaAnswer, captchaExpectedAnswer } = req.body;
-if (!captchaAnswer || !captchaExpectedAnswer) {
-  return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
-}
+      if (!captchaAnswer || !captchaExpectedAnswer) {
+        return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
+      }
+      
+      const userAnswer = parseInt(captchaAnswer);
+      if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
+        return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
+      }
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists with this email" });
+      }
 
-const userAnswer = parseInt(captchaAnswer);
-if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
-  return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
-}
+      // Hash password and create user
       const hashedPassword = await hashPassword(validatedData.password);
       const user = await storage.createUser({
         ...validatedData,
@@ -649,201 +654,46 @@ if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
     }
   });
 
-
-
   app.post("/api/paints", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertPaintSchema.parse(req.body);
       // Override userId with authenticated user's ID
-      const paintData = { ...validatedData, userId: req.user!.id };
-      const paint = await storage.createPaint(paintData);
+      const paint = await storage.createPaint({
+        ...validatedData,
+        userId: req.user!.id,
+      });
       res.status(201).json(paint);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid paint data" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to add paint" });
     }
   });
 
-  app.put("/api/paints/:id", async (req, res) => {
+  app.delete("/api/paints/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const paint = await storage.updatePaint(Number(req.params.id), req.body);
+      const paintId = parseInt(req.params.id);
+      const paint = await storage.getPaint(paintId);
+      
       if (!paint) {
         return res.status(404).json({ message: "Paint not found" });
       }
-      res.json(paint);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update paint" });
-    }
-  });
-
-  app.delete("/api/paints/:id", async (req, res) => {
-    try {
-      const deleted = await storage.deletePaint(Number(req.params.id));
-      if (!deleted) {
-        return res.status(404).json({ message: "Paint not found" });
+      
+      // Check if paint belongs to authenticated user
+      if (paint.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to delete this paint" });
       }
-      res.status(204).send();
+      
+      await storage.deletePaint(paintId);
+      res.json({ message: "Paint deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete paint" });
-    }
-  });
-
-
-
-  // Paint inventory statistics
-  app.get("/api/inventory/stats", async (req, res) => {
-    try {
-      const userId = req.query.userId ? Number(req.query.userId) : undefined;
-      const paints = await storage.getAllPaints(userId);
-      
-      const stats = {
-        total: paints.length,
-        inStock: paints.filter(p => p.status === "in_stock").length,
-        lowStock: paints.filter(p => p.status === "low_stock").length,
-        outOfStock: paints.filter(p => p.status === "out_of_stock").length,
-      };
-      
-      res.json(stats);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch inventory stats" });
-    }
-  });
-
-  // Citadel paint data routes
-  app.get("/api/citadel/paints", async (req, res) => {
-    try {
-      const { search } = req.query;
-      let citadelPaints = getAllCitadelPaints();
-      
-      // If search query provided, filter paints by name
-      if (search && typeof search === 'string') {
-        const searchTerm = search.toLowerCase().trim();
-        citadelPaints = searchCitadelPaints(searchTerm);
-      }
-      
-      const formattedPaints = citadelPaints.map(paint => ({
-        name: paint.name,
-        type: paint.type,
-        color: paint.hexCode,
-        hexCode: paint.hexCode,
-        description: paint.description,
-        productCode: paint.productCode
-      }));
-      
-      res.json({
-        success: true,
-        paints: formattedPaints,
-        count: formattedPaints.length,
-        source: "authentic_database",
-        searchTerm: search || null
-      });
-    } catch (error: any) {
-      console.error("Error fetching Citadel paints:", error);
-      res.status(500).json({ 
-        success: false,
-        message: "Failed to fetch Citadel paint data",
-        error: error.message 
-      });
-    }
-  });
-
-  app.get("/api/citadel/paints/:type", async (req, res) => {
-    try {
-      const { type } = req.params;
-      const citadelPaints = getCitadelPaintsByType(type);
-      const formattedPaints = citadelPaints.map(paint => ({
-        name: paint.name,
-        type: paint.type,
-        color: paint.hexCode,
-        description: paint.description,
-        productCode: paint.productCode
-      }));
-      
-      res.json({
-        success: true,
-        paints: formattedPaints,
-        count: formattedPaints.length,
-        type: type,
-        source: "authentic_database"
-      });
-    } catch (error: any) {
-      console.error("Error fetching Citadel paints by type:", error);
-      res.status(500).json({ 
-        success: false,
-        message: "Failed to fetch Citadel paint data",
-        error: error.message 
-      });
-    }
-  });
-
-  app.post("/api/citadel/import", async (req, res) => {
-    try {
-      console.log("Importing authentic Citadel paint catalog...");
-      const citadelPaints = getAllCitadelPaints();
-      
-      let importedCount = 0;
-      let skippedCount = 0;
-      
-      for (const paint of citadelPaints) {
-        if (!paint.name) continue;
-        
-        // Check if paint already exists by name and brand
-        const existingPaints = await storage.getAllPaints();
-        const existingPaint = existingPaints.find(p => 
-          p.name === paint.name && p.brand === "Citadel"
-        );
-        
-        if (!existingPaint) {
-          await storage.createPaint({
-            name: paint.name,
-            brand: "Citadel",
-            color: paint.hexCode,
-            type: paint.type,
-            status: "in_stock",
-            quantity: 1,
-            userId: 1
-          });
-          importedCount++;
-        } else {
-          skippedCount++;
-        }
-      }
-      
-      res.json({
-        success: true,
-        message: `Successfully imported ${importedCount} authentic Citadel paints`,
-        imported: importedCount,
-        skipped: skippedCount,
-        total: citadelPaints.length,
-        source: "authentic_database"
-      });
-    } catch (error: any) {
-      console.error("Error importing Citadel paints:", error);
-      res.status(500).json({ 
-        success: false,
-        message: "Failed to import Citadel paint data",
-        error: error.message 
-      });
     }
   });
 
   // Project routes
   app.get("/api/projects", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user!.id;
-      const projects = await storage.getAllProjects(userId);
-      
-      // Get paint details for each project
-      const projectsWithPaints = await Promise.all(
-        projects.map(async (project) => {
-          const paints = await storage.getProjectPaints(project.id);
-          return {
-            ...project,
-            paints
-          };
-        })
-      );
-      
-      res.json(projectsWithPaints);
+      const projects = await storage.getAllProjects(req.user!.id);
+      res.json(projects);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch projects" });
     }
@@ -851,10 +701,18 @@ if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
 
   app.get("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const project = await storage.getProject(Number(req.params.id));
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
+      
+      // Check if project belongs to authenticated user
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to view this project" });
+      }
+      
       res.json(project);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch project" });
@@ -863,78 +721,155 @@ if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
 
   app.post("/api/projects", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user!.id;
-      const projectData = { ...req.body, userId };
-      const project = await storage.createProject(projectData);
+      const { name, description, imageUrl, paints } = req.body;
+      
+      const project = await storage.createProject({
+        name,
+        description,
+        imageUrl,
+        userId: req.user!.id,
+      });
+      
+      // Add paints to project if provided
+      if (paints && paints.length > 0) {
+        for (const paintData of paints) {
+          await storage.addPaintToProject(project.id, paintData);
+        }
+      }
+      
       res.status(201).json(project);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to create project" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to create project" });
     }
   });
 
   app.patch("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const project = await storage.updateProject(Number(req.params.id), req.body);
+      const projectId = parseInt(req.params.id);
+      const { name, description, imageUrl } = req.body;
+      
+      const project = await storage.getProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-      res.json(project);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update project" });
+      
+      // Check if project belongs to authenticated user
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to update this project" });
+      }
+      
+      const updatedProject = await storage.updateProject(projectId, {
+        name,
+        description,
+        imageUrl,
+      });
+      
+      res.json(updatedProject);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to update project" });
     }
   });
 
   app.delete("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteProject(Number(req.params.id));
-      if (!success) {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      
+      if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-      res.status(204).send();
+      
+      // Check if project belongs to authenticated user
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to delete this project" });
+      }
+      
+      await storage.deleteProject(projectId);
+      res.json({ message: "Project deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete project" });
     }
   });
 
-  // Project Paint routes
-  app.get("/api/projects/:id/paints", requireAuth, async (req: AuthenticatedRequest, res) => {
-    try {
-      const projectId = Number(req.params.id);
-      const projectPaints = await storage.getProjectPaints(projectId);
-      res.json(projectPaints);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch project paints" });
-    }
-  });
-
+  // Project paint routes
   app.post("/api/projects/:id/paints", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const projectId = Number(req.params.id);
-      const { paintId, partName, technique, usageNotes } = req.body;
-      const projectPaint = await storage.addPaintToProject({
-        projectId,
-        paintId,
-        partName,
-        technique,
-        usageNotes
-      });
+      const projectId = parseInt(req.params.id);
+      const paintData = req.body;
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Check if project belongs to authenticated user
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to modify this project" });
+      }
+      
+      const projectPaint = await storage.addPaintToProject(projectId, paintData);
       res.status(201).json(projectPaint);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to add paint to project" });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to add paint to project" });
     }
   });
 
   app.delete("/api/projects/:projectId/paints/:paintId", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const projectId = Number(req.params.projectId);
-      const paintId = Number(req.params.paintId);
-      const success = await storage.removePaintFromProject(projectId, paintId);
-      if (!success) {
-        return res.status(404).json({ message: "Paint not found in project" });
+      const projectId = parseInt(req.params.projectId);
+      const paintId = parseInt(req.params.paintId);
+      
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
       }
-      res.status(204).send();
+      
+      // Check if project belongs to authenticated user
+      if (project.userId !== req.user!.id) {
+        return res.status(403).json({ message: "Not authorized to modify this project" });
+      }
+      
+      await storage.removePaintFromProject(projectId, paintId);
+      res.json({ message: "Paint removed from project successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to remove paint from project" });
+    }
+  });
+
+  // Citadel paint database routes
+  app.get("/api/citadel-paints", (req, res) => {
+    const citadelPaints = getAllCitadelPaints();
+    res.json(citadelPaints);
+  });
+
+  app.get("/api/citadel-paints/:type", (req, res) => {
+    const { type } = req.params;
+    const paintsByType = getCitadelPaintsByType(type);
+    res.json(paintsByType);
+  });
+
+  app.get("/api/citadel-paints/search/:query", (req, res) => {
+    const { query } = req.params;
+    const searchResults = searchCitadelPaints(query);
+    res.json(searchResults);
+  });
+
+  app.post("/api/citadel-paints/scrape", async (req, res) => {
+    try {
+      const category = req.body.category;
+      const results = await scrapeKnownCitadelCategories(category ? [category] : undefined);
+      res.json({ message: "Scraping complete", results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Scraping failed" });
+    }
+  });
+
+  app.post("/api/citadel-paints/scrape-all", async (req, res) => {
+    try {
+      const results = await scrapeAllCitadelPaints();
+      res.json({ message: "Full scraping complete", results });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Full scraping failed" });
     }
   });
 
