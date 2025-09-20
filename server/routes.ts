@@ -55,16 +55,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate captcha
       const { captchaAnswer, captchaExpectedAnswer } = req.body;
       if (!captchaAnswer || !captchaExpectedAnswer || parseInt(captchaAnswer) !== captchaExpectedAnswer) {
-        return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
-      }
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(validatedData.email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists with this email" });
-      }
+       // Validate captcha
+const { captchaAnswer, captchaExpectedAnswer } = req.body;
+if (!captchaAnswer || !captchaExpectedAnswer) {
+  return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
+}
 
-      // Hash password and create user
+const userAnswer = parseInt(captchaAnswer);
+if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
+  return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
+}
       const hashedPassword = await hashPassword(validatedData.password);
       const user = await storage.createUser({
         ...validatedData,
