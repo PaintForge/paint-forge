@@ -8,11 +8,19 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+interface ApiRequestOptions {
+  withCredentials?: boolean;
+  parse?: boolean;
+  timeoutMs?: number;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
+  options: ApiRequestOptions = {}
+): Promise<any> {
+  const { withCredentials = true, parse = true, timeoutMs = 10000 } = options;
   const token = getAuthToken();
   
   // Completely block API calls for protected endpoints if no token
@@ -34,15 +42,43 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(fullUrl, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  await throwIfResNotOk(res);
-  return res;
+  try {
+    const fetchOptions: RequestInit = {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      signal: controller.signal,
+    };
+
+    // Only include credentials for authenticated endpoints
+    if (withCredentials) {
+      fetchOptions.credentials = "include";
+    }
+
+    const res = await fetch(fullUrl, fetchOptions);
+    clearTimeout(timeoutId);
+
+    await throwIfResNotOk(res);
+
+    if (parse) {
+      // Parse JSON response
+      const text = await res.text();
+      const jsonData = text ? JSON.parse(text) : { message: "Request completed successfully." };
+      return { data: jsonData, status: res.status };
+    }
+
+    return res;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
