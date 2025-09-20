@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Alert, AlertDescription } from "../components/ui/alert";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
@@ -18,7 +18,6 @@ import type { z } from "zod";
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function Register() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -50,8 +49,13 @@ export default function Register() {
         captchaAnswer: data.captchaAnswer, // Keep as string
         captchaExpectedAnswer: captcha.answer,
       };
-      const response = await apiRequest("POST", "/api/auth/register", requestData);
-      return response.json();
+      
+      // Use new API request with timeout and no credentials for public endpoint
+      const { data: responseData } = await apiRequest("POST", "/api/auth/register", requestData, { 
+        withCredentials: false,
+        timeoutMs: 15000 // 15 second timeout for registration
+      });
+      return responseData;
     },
     onSuccess: (data) => {
       setSuccess(data.message);
