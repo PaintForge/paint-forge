@@ -836,40 +836,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Citadel paint database routes
-  app.get("/api/citadel-paints", (req, res) => {
-    const citadelPaints = getAllCitadelPaints();
-    res.json(citadelPaints);
-  });
-
-  app.get("/api/citadel-paints/:type", (req, res) => {
-    const { type } = req.params;
-    const paintsByType = getCitadelPaintsByType(type);
-    res.json(paintsByType);
-  });
-
-  app.get("/api/citadel-paints/search/:query", (req, res) => {
-    const { query } = req.params;
-    const searchResults = searchCitadelPaints(query);
-    res.json(searchResults);
-  });
-
-  app.post("/api/citadel-paints/scrape", async (req, res) => {
+  // Showcase routes (public)
+  app.get("/api/showcases", async (req, res) => {
     try {
-      const category = req.body.category;
-      const results = await scrapeKnownCitadelCategories(category ? [category] : undefined);
-      res.json({ message: "Scraping complete", results });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message || "Scraping failed" });
+      const showcases = await storage.getAllShowcases();
+      res.json(showcases);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch showcases" });
     }
   });
 
-  app.post("/api/citadel-paints/scrape-all", async (req, res) => {
+  app.get("/api/showcases/:id", async (req, res) => {
+    try {
+      const showcase = await storage.getShowcase(Number(req.params.id));
+      if (!showcase) {
+        return res.status(404).json({ message: "Showcase not found" });
+      }
+      res.json(showcase);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch showcase" });
+    }
+  });
+
+  app.post("/api/showcases", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const showcase = await storage.createShowcase({
+        ...req.body,
+        userId: req.user!.id,
+      });
+      res.status(201).json(showcase);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message || "Failed to create showcase" });
+    }
+  });
+
+  // System routes  
+  app.get("/api/stats/paints", async (req, res) => {
+    try {
+      const paintsCount = await storage.getPaintStats();
+      res.json(paintsCount);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch paint stats" });
+    }
+  });
+
+  // Citadel Paint Database Routes
+  app.get("/api/citadel/paints", async (req, res) => {
+    try {
+      const paints = getAllCitadelPaints();
+      res.json(paints);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch Citadel paints" });
+    }
+  });
+
+  app.get("/api/citadel/paints/type/:type", async (req, res) => {
+    try {
+      const paints = getCitadelPaintsByType(req.params.type);
+      res.json(paints);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch Citadel paints by type" });
+    }
+  });
+
+  app.get("/api/citadel/paints/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ message: "Search query required" });
+      }
+      const paints = searchCitadelPaints(query);
+      res.json(paints);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search Citadel paints" });
+    }
+  });
+
+  app.post("/api/admin/scrape-citadel", requireAuth, async (req: AuthenticatedRequest, res) => {
+    // Check if user is admin
+    const user = await storage.getUser(req.user!.id);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
     try {
       const results = await scrapeAllCitadelPaints();
-      res.json({ message: "Full scraping complete", results });
+      res.json({
+        message: "Scraping completed successfully",
+        results
+      });
     } catch (error: any) {
-      res.status(500).json({ message: error.message || "Full scraping failed" });
+      res.status(500).json({ 
+        message: "Scraping failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  app.post("/api/admin/scrape-citadel-categories", requireAuth, async (req: AuthenticatedRequest, res) => {
+    // Check if user is admin
+    const user = await storage.getUser(req.user!.id);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    try {
+      const results = await scrapeKnownCitadelCategories();
+      res.json({
+        message: "Category scraping completed successfully",
+        results
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: "Category scraping failed", 
+        error: error.message 
+      });
     }
   });
 
