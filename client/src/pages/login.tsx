@@ -8,7 +8,7 @@ import { Button } from "../components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Link, useLocation } from "wouter";
-import { Shield, Mail, Lock, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { Shield, Mail, Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { loginSchema } from "@shared/schema";
@@ -53,7 +53,10 @@ export default function Login() {
       
       if (error.message) {
         const errorText = error.message.toLowerCase();
-        if (errorText.includes("invalid email or password") || errorText.includes("401")) {
+        // Check for email verification message first (before generic 401 handling)
+        if (errorText.includes("verify your email") || errorText.includes("please verify your email")) {
+          userMessage = "Please verify your email before logging in. Check your inbox for the verification link.";
+        } else if (errorText.includes("invalid email or password") || errorText.includes("401")) {
           userMessage = "Invalid email or password. Please check your credentials and try again.";
         } else if (errorText.includes("network") || errorText.includes("fetch")) {
           userMessage = "Connection error. Please check your internet connection and try again.";
