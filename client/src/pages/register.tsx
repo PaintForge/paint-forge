@@ -73,8 +73,8 @@ export default function Register() {
         } else if (errorText.includes("password") && errorText.includes("weak")) {
           userMessage = "Password is too weak. Please choose a stronger password.";
         } else if (errorText.includes("network") || errorText.includes("fetch")) {
-          userMessage = "Connection error. Please check your internet connection and try again.";
-        } else if (errorText.includes("server") || errorText.includes("500")) {
+          if (errorText.includes("incorrect captcha") || errorText.includes("invalid captcha")) {
+  userMessage = "Incorrect captcha answer. Please try again.";
           userMessage = "Server error. Please try again in a few moments.";
         }
       }
