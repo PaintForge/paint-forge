@@ -40,21 +40,23 @@ export default function Register() {
     mutationFn: async (data: RegisterForm) => {
       // Add captcha validation to the request
       const requestData = {
-        ...data,
-        captchaAnswer: parseInt(data.captchaAnswer),
-        captchaExpectedAnswer: captcha.answer,
-      };
-      const response = await apiRequest("POST", "/api/auth/register", requestData);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setSuccess(data.message);
-      setError("");
-      form.reset();
-      setCaptcha(generateCaptcha()); // Generate new captcha
-      
-      toast({
-        title: "Account created!",
+       const registerMutation = useMutation({
+  mutationFn: async (data: RegisterForm) => {
+    // Validate captcha on client side first
+    const userAnswer = parseInt(data.captchaAnswer);
+    if (userAnswer !== captcha.answer) {
+      throw new Error("Incorrect captcha answer. Please try again.");
+    }
+    
+    // Send only the answer as string (matching schema)
+    const requestData = {
+      ...data,
+      captchaAnswer: data.captchaAnswer, // Keep as string
+      captchaExpectedAnswer: captcha.answer,
+    };
+    const response = await apiRequest("POST", "/api/auth/register", requestData);
+    return response.json();
+  },
         description: "Please check your email to verify your account.",
       });
     },
