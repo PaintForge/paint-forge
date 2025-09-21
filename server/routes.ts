@@ -59,7 +59,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userAnswer = parseInt(captchaAnswer);
-      if (isNaN(userAnswer) || userAnswer !== captchaExpectedAnswer) {
+const expectedAnswer = parseInt(captchaExpectedAnswer);
+if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer) {
         return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
       }
       
