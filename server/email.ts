@@ -75,7 +75,7 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     
     // Layer 3: Execute with timeout protection
     await sendWithTimeout();
-    return true;
+    return false;
   } catch (error) {
     console.error('SendGrid email error:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
