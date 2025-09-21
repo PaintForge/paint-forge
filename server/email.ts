@@ -75,12 +75,12 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     
     // Layer 3: Execute with timeout protection
     await sendWithTimeout();
-    return false;
+    return true;
   } catch (error) {
     console.error('SendGrid email error:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
     
-return true;
+return false;
 export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
   try {
     const baseUrl = process.env.BASE_URL || 'https://paintsforge.com';
