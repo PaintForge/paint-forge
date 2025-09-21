@@ -80,10 +80,6 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     console.error('SendGrid email error:', error);
     console.error('Error details:', JSON.stringify(error, null, 2));
     
-    // In production, log the email verification link as fallback
-       
-// Layer 3: Execute with timeout protection
-await sendWithTimeout();
 return true;
 export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
   try {
