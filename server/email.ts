@@ -82,12 +82,6 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     
     // In production, log the email verification link as fallback
        
-    return false;
-  }
-}
-
-export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
-
 // Layer 3: Execute with timeout protection
 await sendWithTimeout();
 return true;
