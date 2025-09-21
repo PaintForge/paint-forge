@@ -81,12 +81,7 @@ async function sendEmail(params: EmailParams): Promise<boolean> {
     console.error('Error details:', JSON.stringify(error, null, 2));
     
     // In production, log the email verification link as fallback
-    if (params.subject.includes('Verify Your Paint Forge Account')) {
-      const baseUrl = process.env.BASE_URL || 'https://paintsforge.com';
-      console.log(`🔗 FALLBACK: Email verification link for ${params.to}:`);
-      console.log(`${baseUrl}/api/auth/verify-email?token=<TOKEN_FROM_REGISTRATION>`);
-    }
-    
+       
     return false;
   }
 }
