@@ -47,7 +47,7 @@ export default function Register() {
       const requestData = {
         ...data,
         captchaAnswer: data.captchaAnswer, // Keep as string
-        captchaExpectedAnswer: captcha.answer,
+        captchaExpectedAnswer: captcha.answer.toString(), // Convert to string
       };
       
       // Use new API request with timeout and no credentials for public endpoint
