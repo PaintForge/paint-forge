@@ -21,37 +21,77 @@ interface EmailParams {
   html?: string;
 }
 
-// BULLETPROOF TIMEOUT: Triple-layer timeout protection
-console.log('📧 Attempting to send email via SendGrid with timeout protection...');
+async function sendEmail(params: EmailParams): Promise<boolean> {
+  try {
+    if (!process.env.SENDGRID_API_KEY) {
+      // Development fallback - log email details
+      console.log(`📧 SendGrid Email (Development Mode):`);
+      console.log(`To: ${params.to}`);
+      console.log(`From: ${params.from}`);
+      console.log(`Subject: ${params.subject}`);
+      return true;
+    }
 
-// Layer 1: Create fresh SendGrid instance with timeout
-const customMailService = new MailService();
-customMailService.setApiKey(process.env.SENDGRID_API_KEY);
-customMailService.setTimeout(8000); // 8 second HTTP timeout
-
-// Layer 2: Promise-based timeout wrapper
-const sendWithTimeout = () => {
-  return new Promise((resolve, reject) => {
-    // Set up the timeout first
-    const timeoutId = setTimeout(() => {
-      console.log('❌ SendGrid timeout after 10 seconds - forcing rejection');
-      reject(new Error('SendGrid timeout: Connection took longer than 10 seconds'));
-    }, 10000);
+    const sendGridMessage: any = {
+      to: params.to,
+      from: params.from,
+      subject: params.subject,
+    };
     
-    // Attempt to send
-    customMailService.send(sendGridMessage)
-      .then((result) => {
-        clearTimeout(timeoutId);
-        console.log('✅ SendGrid email sent successfully');
-        resolve(result);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        console.log('❌ SendGrid send failed:', error.message);
-        reject(error);
+    if (params.text) sendGridMessage.text = params.text;
+    if (params.html) sendGridMessage.html = params.html;
+    
+    // BULLETPROOF TIMEOUT: Triple-layer timeout protection
+    console.log('📧 Attempting to send email via SendGrid with timeout protection...');
+    
+    // Layer 1: Create fresh SendGrid instance with timeout
+    const customMailService = new MailService();
+    customMailService.setApiKey(process.env.SENDGRID_API_KEY);
+    customMailService.setTimeout(8000); // 8 second HTTP timeout
+    
+    // Layer 2: Promise-based timeout wrapper
+    const sendWithTimeout = () => {
+      return new Promise((resolve, reject) => {
+        // Set up the timeout first
+        const timeoutId = setTimeout(() => {
+          console.log('❌ SendGrid timeout after 10 seconds - forcing rejection');
+          reject(new Error('SendGrid timeout: Connection took longer than 10 seconds'));
+        }, 10000);
+        
+        // Attempt to send
+        customMailService.send(sendGridMessage)
+          .then((result) => {
+            clearTimeout(timeoutId);
+            console.log('✅ SendGrid email sent successfully');
+            resolve(result);
+          })
+          .catch((error) => {
+            clearTimeout(timeoutId);
+            console.log('❌ SendGrid send failed:', error.message);
+            reject(error);
+          });
       });
-  });
-};
+    };
+    
+    // Layer 3: Execute with timeout protection
+    await sendWithTimeout();
+    return true;
+  } catch (error) {
+    console.error('SendGrid email error:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    
+    // In production, log the email verification link as fallback
+    if (params.subject.includes('Verify Your Paint Forge Account')) {
+      const baseUrl = process.env.BASE_URL || 'https://paintsforge.com';
+      console.log(`🔗 FALLBACK: Email verification link for ${params.to}:`);
+      console.log(`${baseUrl}/api/auth/verify-email?token=<TOKEN_FROM_REGISTRATION>`);
+    }
+    
+    return false;
+  }
+}
+
+export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
 
 // Layer 3: Execute with timeout protection
 await sendWithTimeout();
