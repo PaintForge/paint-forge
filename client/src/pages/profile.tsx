@@ -17,15 +17,13 @@ import { User, Camera, Save, Upload, Lock } from "lucide-react";
 interface UserProfile {
   id: number;
   email: string;
-  firstName: string;
-  lastName: string;
+  accountName: string;
   emailVerified: boolean;
   profileImageUrl?: string;
 }
 
 const profileSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  accountName: z.string().min(1, "Account name is required"),
 });
 
 const emailChangeSchema = z.object({
@@ -59,8 +57,7 @@ export default function Profile() {
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
+      accountName: user?.accountName || "",
     },
   });
 
@@ -84,8 +81,7 @@ export default function Profile() {
   useEffect(() => {
     if (user) {
       form.reset({
-        firstName: user.firstName,
-        lastName: user.lastName,
+        accountName: user.accountName,
       });
     }
   }, [user, form]);
@@ -251,8 +247,20 @@ export default function Profile() {
   };
 
   const getUserInitials = () => {
-    if (!user?.firstName || !user?.lastName) return "U";
-    return user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase();
+    if (!user?.accountName) return "U";
+    // Take first 2 characters or first letter if name is short
+    const name = user.accountName.trim();
+    if (name.length === 0) return "U";
+    if (name.length === 1) return name.toUpperCase();
+    
+    // If contains space, take first letter of first and last word
+    const parts = name.split(' ').filter(part => part.length > 0);
+    if (parts.length >= 2) {
+      return parts[0].charAt(0).toUpperCase() + parts[parts.length - 1].charAt(0).toUpperCase();
+    }
+    
+    // Otherwise take first 2 characters
+    return name.substring(0, 2).toUpperCase();
   };
 
   const onSubmit = (data: ProfileForm) => {
@@ -315,7 +323,7 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-4">
             <Avatar className="w-24 h-24">
-              <AvatarImage src={user.profileImageUrl} alt={user.firstName} />
+              <AvatarImage src={user.profileImageUrl} alt={user.accountName} />
               <AvatarFallback className="bg-orange-500 text-black font-semibold text-2xl">
                 {getUserInitials()}
               </AvatarFallback>
@@ -357,45 +365,23 @@ export default function Profile() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="John"
-                            className="bg-background/50 text-black placeholder:text-gray-500"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Doe"
-                            className="bg-background/50 text-black placeholder:text-gray-500"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-
+                <FormField
+                  control={form.control}
+                  name="accountName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Choose your display name"
+                          className="bg-white text-black placeholder:text-gray-400"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="flex justify-end">
                   <Button
