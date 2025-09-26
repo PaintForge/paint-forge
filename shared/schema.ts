@@ -7,8 +7,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  firstName: text("first_name"),
-  lastName: text("last_name"),
+  accountName: text("account_name"),
   emailVerified: boolean("email_verified").default(false),
   verificationToken: text("verification_token"),
   profileImageUrl: text("profile_image_url"),
@@ -66,8 +65,6 @@ export const projectPaints = pgTable("project_paints", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-
-
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -84,8 +81,7 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({
 export const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+  accountName: z.string().min(1, "Account name is required"),
   captchaAnswer: z.string().min(1, "Please solve the captcha"),
 });
 
