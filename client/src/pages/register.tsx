@@ -29,8 +29,7 @@ export default function Register() {
     defaultValues: {
       email: "",
       password: "",
-      firstName: "",
-      lastName: "",
+      accountName: "",
       captchaAnswer: "",
     },
   });
@@ -43,10 +42,10 @@ export default function Register() {
         throw new Error("Incorrect captcha answer. Please try again.");
       }
       
-      // Send only the answer as string (matching schema)
+      // Send both captcha values as strings for consistent parsing
       const requestData = {
         ...data,
-        captchaAnswer: data.captchaAnswer, // Keep as string
+        captchaAnswer: data.captchaAnswer, // Keep as string from form
         captchaExpectedAnswer: captcha.answer.toString(), // Convert to string
       };
       
@@ -143,49 +142,26 @@ export default function Register() {
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center space-x-2">
-                          <User className="w-4 h-4" />
-                          <span>First Name</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="John"
-                            className="bg-background/50 text-black placeholder:text-gray-500"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center space-x-2">
-                          <User className="w-4 h-4" />
-                          <span>Last Name</span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Doe"
-                            className="bg-background/50 text-black placeholder:text-gray-500"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="accountName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center space-x-2">
+                        <User className="w-4 h-4" />
+                        <span>Account Name</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Choose your display name"
+                          className="bg-white text-black placeholder:text-gray-400"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
