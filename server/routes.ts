@@ -59,8 +59,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userAnswer = parseInt(captchaAnswer);
-const expectedAnswer = parseInt(captchaExpectedAnswer);
-if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer) {
+      const expectedAnswer = parseInt(captchaExpectedAnswer);
+      if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer) {
         return res.status(400).json({ message: "Invalid captcha answer. Please try again." });
       }
       
@@ -123,15 +123,15 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
         user: {
           id: user.id,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          accountName: user.accountName,
         },
       });
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Login failed" });
     }
   });
-    app.get("/api/auth/verify-email", async (req, res) => {
+
+  app.get("/api/auth/verify-email", async (req, res) => {
     try {
       const { token } = req.query;
       
@@ -149,23 +149,6 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.redirect("/login?error=verification_failed");
     }
   });
-    try {
-      const { token } = req.query;
-      
-      if (!token || typeof token !== "string") {
-        return res.status(400).json({ message: "Verification token required" });
-      }
-
-      const success = await storage.verifyUserEmail(token);
-      if (success) {
-        res.json({ message: "Email verified successfully! You can now log in." });
-      } else {
-        res.status(400).json({ message: "Invalid or expired verification token" });
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: "Email verification failed" });
-    }
-  });
 
   app.get("/api/auth/me", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
@@ -177,8 +160,7 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.json({
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        accountName: user.accountName,
         emailVerified: user.emailVerified,
         profileImageUrl: user.profileImageUrl,
         isAdmin: user.isAdmin,
@@ -190,15 +172,14 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
 
   app.patch("/api/auth/profile", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const { firstName, lastName } = req.body;
+      const { accountName } = req.body;
       
-      if (!firstName || !lastName) {
-        return res.status(400).json({ message: "First name and last name are required" });
+      if (!accountName) {
+        return res.status(400).json({ message: "Account name is required" });
       }
 
       const updatedUser = await storage.updateUser(req.user!.id, {
-        firstName,
-        lastName,
+        accountName,
       });
 
       if (!updatedUser) {
@@ -208,8 +189,7 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.json({
         id: updatedUser.id,
         email: updatedUser.email,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
+        accountName: updatedUser.accountName,
         emailVerified: updatedUser.emailVerified,
         profileImageUrl: updatedUser.profileImageUrl,
         isAdmin: updatedUser.isAdmin,
@@ -238,8 +218,7 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.json({
         id: updatedUser.id,
         email: updatedUser.email,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
+        accountName: updatedUser.accountName,
         emailVerified: updatedUser.emailVerified,
         profileImageUrl: updatedUser.profileImageUrl,
         isAdmin: updatedUser.isAdmin,
@@ -404,8 +383,8 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
 
       // Send email notification to support@paintsforge.com
       const { sendFeedbackNotification } = await import('./email');
-      const userName = user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}` 
+      const userName = user.accountName 
+        ? user.accountName 
         : user.email;
       
       await sendFeedbackNotification(
@@ -461,8 +440,7 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       const safeUsers = users.map(u => ({
         id: u.id,
         email: u.email,
-        firstName: u.firstName,
-        lastName: u.lastName,
+        accountName: u.accountName,
         isAdmin: u.isAdmin,
         emailVerified: u.emailVerified,
         lastLoginAt: u.lastLoginAt,
@@ -500,8 +478,7 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       const safeUser = {
         id: updatedUser.id,
         email: updatedUser.email,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
+        accountName: updatedUser.accountName,
         isAdmin: updatedUser.isAdmin,
         emailVerified: updatedUser.emailVerified,
         lastLoginAt: updatedUser.lastLoginAt,
@@ -675,6 +652,8 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
     }
   });
 
+
+
   app.post("/api/paints", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertPaintSchema.parse(req.body);
@@ -683,11 +662,11 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       const paint = await storage.createPaint(paintData);
       res.status(201).json(paint);
     } catch (error) {
-      res.status(400).json({ message: "Invalid paint data" });
+      res.status(500).json({ message: "Failed to create paint" });
     }
   });
 
-  app.put("/api/paints/:id", async (req, res) => {
+  app.patch("/api/paints/:id", async (req, res) => {
     try {
       const paint = await storage.updatePaint(Number(req.params.id), req.body);
       if (!paint) {
@@ -710,6 +689,8 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.status(500).json({ message: "Failed to delete paint" });
     }
   });
+
+
 
   // Paint inventory statistics
   app.get("/api/inventory/stats", async (req, res) => {
