@@ -131,8 +131,24 @@ if (isNaN(userAnswer) || isNaN(expectedAnswer) || userAnswer !== expectedAnswer)
       res.status(400).json({ message: error.message || "Login failed" });
     }
   });
+    app.get("/api/auth/verify-email", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== "string") {
+        return res.redirect("/login?error=invalid_token");
+      }
 
-  app.get("/api/auth/verify-email", async (req, res) => {
+      const success = await storage.verifyUserEmail(token);
+      if (success) {
+        res.redirect("/login?verified=true");
+      } else {
+        res.redirect("/login?error=invalid_token");
+      }
+    } catch (error: any) {
+      res.redirect("/login?error=verification_failed");
+    }
+  });
     try {
       const { token } = req.query;
       
