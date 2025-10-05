@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { Button } from "../components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Link, useLocation } from "wouter";
-import { Shield, Mail, Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Shield, Mail, Lock, AlertCircle, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { loginSchema } from "@shared/schema";
@@ -20,7 +20,19 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "true") {
+      setSuccess("Email verified successfully! You can now log in.");
+    } else if (params.get("error") === "invalid_token") {
+      setError("Invalid or expired verification link.");
+    } else if (params.get("error") === "verification_failed") {
+      setError("Email verification failed. Please try again.");
+    }
+  }, []);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -91,6 +103,15 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
+            {success && (
+              <Alert className="mb-6 border-green-500/20 bg-green-500/10">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-400">
+                  {success}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {error && (
               <Alert className="mb-6 border-red-500/20 bg-red-500/10">
                 <AlertCircle className="h-4 w-4 text-red-500" />
