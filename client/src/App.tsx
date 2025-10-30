@@ -10,6 +10,8 @@ import Projects from "./pages/projects";
 
 import Login from "./pages/login";
 import Register from "./pages/register";
+import ForgotPassword from "./pages/forgot-password";
+import ResetPassword from "./pages/reset-password";
 import Profile from "./pages/profile";
 import Help from "./pages/help";
 import PrivacyPolicy from "./pages/privacy-policy";
@@ -47,6 +49,8 @@ function Router() {
           <Route path="/projects" component={Projects} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/reset-password" component={ResetPassword} />
           <Route path="/profile" component={Profile} />
           <Route path="/help" component={Help} />
           <Route path="/feedback" component={FeedbackPage} />
@@ -76,8 +80,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
         <Router />
+        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );
