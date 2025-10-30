@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { insertPaintSchema, registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, insertFeedbackSchema } from "@shared/schema";
 import { scrapeAllCitadelPaints, scrapeKnownCitadelCategories } from "./citadel-scraper";
 import { getAllCitadelPaints, getCitadelPaintsByType, searchCitadelPaints } from "./citadel-paint-database";
@@ -100,23 +103,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find user by email
       const user = await storage.getUserByEmail(validatedData.email);
       if (!user) {
+        console.log("[LOGIN] User not found:", validatedData.email);
         return res.status(401).json({ message: "Invalid email or password" });
       }
+
+      console.log("[LOGIN] User found:", validatedData.email, "emailVerified:", user.emailVerified);
 
       // Check password
       const isValidPassword = await comparePassword(validatedData.password, user.password);
       if (!isValidPassword) {
+        console.log("[LOGIN] Invalid password for:", validatedData.email);
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
       // Check if email is verified
       if (!user.emailVerified) {
+        console.log("[LOGIN] Email not verified for:", validatedData.email);
         return res.status(401).json({ message: "Please verify your email before logging in" });
       }
 
       // Generate token
       const token = generateToken(user.id, user.email);
 
+      console.log("[LOGIN] Login successful for:", validatedData.email);
       res.json({
         message: "Login successful",
         token,
@@ -127,6 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error: any) {
+      console.error("[LOGIN] Error:", error);
       res.status(400).json({ message: error.message || "Login failed" });
     }
   });
@@ -136,16 +146,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { token } = req.query;
       
       if (!token || typeof token !== "string") {
+        console.log("[VERIFY] Missing or invalid token");
         return res.redirect("/login?error=invalid_token");
       }
 
+      console.log("[VERIFY] Attempting to verify email with token:", token.substring(0, 8) + "...");
       const success = await storage.verifyUserEmail(token);
+      console.log("[VERIFY] Verification result:", success);
+      
       if (success) {
+        // Double-check the user was actually updated
+        const [verifiedUser] = await db.select().from(users).where(eq(users.verificationToken, null));
+        console.log("[VERIFY] User found after verification:", !!verifiedUser);
         res.redirect("/login?verified=true");
       } else {
+        console.log("[VERIFY] Verification failed - token not found in database");
         res.redirect("/login?error=invalid_token");
       }
     } catch (error: any) {
+      console.error("[VERIFY] Error during verification:", error);
       res.redirect("/login?error=verification_failed");
     }
   });
@@ -662,11 +681,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paint = await storage.createPaint(paintData);
       res.status(201).json(paint);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create paint" });
+      res.status(400).json({ message: "Invalid paint data" });
     }
   });
 
-  app.patch("/api/paints/:id", async (req, res) => {
+  app.put("/api/paints/:id", async (req, res) => {
     try {
       const paint = await storage.updatePaint(Number(req.params.id), req.body);
       if (!paint) {
