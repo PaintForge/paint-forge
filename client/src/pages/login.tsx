@@ -184,6 +184,7 @@ export default function Login() {
                   type="submit"
                   className="w-full bg-orange-500 hover:bg-orange-600 text-black font-semibold"
                   disabled={loginMutation.isPending}
+                  data-testid="button-signin"
                 >
                   {loginMutation.isPending ? "Signing In..." : "Sign In"}
                 </Button>
@@ -191,6 +192,11 @@ export default function Login() {
             </Form>
 
             <div className="mt-6 text-center space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <Link href="/forgot-password" className="text-orange-500 hover:text-orange-400 font-medium">
+                  Forgot your password?
+                </Link>
+              </p>
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{" "}
                 <Link href="/register" className="text-orange-500 hover:text-orange-400 font-medium">
