@@ -22,16 +22,6 @@ export default function ResetPassword() {
   const [token, setToken] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const resetToken = params.get("token");
-    if (resetToken) {
-      setToken(resetToken);
-    } else {
-      setError("Invalid reset link. Please request a new password reset.");
-    }
-  }, []);
-
   const form = useForm<ResetPasswordForm>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -39,6 +29,18 @@ export default function ResetPassword() {
       password: "",
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get("token");
+    if (resetToken) {
+      setToken(resetToken);
+      // Set the token in the form as well
+      form.setValue("token", resetToken);
+    } else {
+      setError("Invalid reset link. Please request a new password reset.");
+    }
+  }, [form]);
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: ResetPasswordForm) => {
@@ -63,7 +65,14 @@ export default function ResetPassword() {
   const onSubmit = (data: ResetPasswordForm) => {
     setError("");
     setSuccess("");
-    resetPasswordMutation.mutate({ ...data, token });
+    
+    // Debug: Log form errors if any
+    if (Object.keys(form.formState.errors).length > 0) {
+      console.error("Form validation errors:", form.formState.errors);
+      return;
+    }
+    
+    resetPasswordMutation.mutate({ password: data.password, token });
   };
 
   return (
@@ -117,7 +126,7 @@ export default function ResetPassword() {
                           <div className="relative">
                             <Input
                               type={showPassword ? "text" : "password"}
-                              placeholder="At least 6 characters"
+                              placeholder="At least 8 characters"
                               className="bg-white text-black pr-10 placeholder:text-gray-400"
                               data-testid="input-password"
                               {...field}
