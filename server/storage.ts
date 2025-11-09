@@ -534,9 +534,6 @@ export class DatabaseStorage implements IStorage {
 
   async verifyPasswordReset(token: string, newPassword: string): Promise<boolean> {
     if (!token || !newPassword) {
-      return false;
-    async verifyPasswordReset(token: string, newPassword: string): Promise<boolean> {
-    if (!token || !newPassword) {
       console.log("[STORAGE] verifyPasswordReset - Missing token or password");
       return false;
     }
@@ -595,6 +592,20 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
   }
+
+  // Feedback operations
+  async createFeedback(feedbackData: InsertFeedback & { userId: number }): Promise<Feedback> {
+    const [newFeedback] = await db
+      .insert(feedback)
+      .values({
+        ...feedbackData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return newFeedback;
+  }
+
   async getFeedback(userId: number): Promise<Feedback[]> {
     return await db
       .select()
@@ -617,8 +628,7 @@ export class DatabaseStorage implements IStorage {
         user: {
           id: users.id,
           email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          accountName: users.accountName,
         },
       })
       .from(feedback)
