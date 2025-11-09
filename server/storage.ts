@@ -535,20 +535,31 @@ export class DatabaseStorage implements IStorage {
   async verifyPasswordReset(token: string, newPassword: string): Promise<boolean> {
     if (!token || !newPassword) {
       return false;
+    async verifyPasswordReset(token: string, newPassword: string): Promise<boolean> {
+    if (!token || !newPassword) {
+      console.log("[STORAGE] verifyPasswordReset - Missing token or password");
+      return false;
     }
 
     try {
+      console.log("[STORAGE] verifyPasswordReset - Looking for user with token");
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.passwordResetToken, token));
 
       if (!user || !user.passwordResetExpiry) {
+        console.log("[STORAGE] verifyPasswordReset - User not found or no expiry set");
         return false;
       }
 
+      console.log("[STORAGE] verifyPasswordReset - User found:", user.email);
+      console.log("[STORAGE] verifyPasswordReset - Token expiry:", user.passwordResetExpiry);
+      console.log("[STORAGE] verifyPasswordReset - Current time:", new Date());
+
       // Check if token has expired
       if (new Date() > user.passwordResetExpiry) {
+        console.log("[STORAGE] verifyPasswordReset - Token expired, cleaning up");
         // Clean up expired token
         await db
           .update(users)
@@ -560,11 +571,13 @@ export class DatabaseStorage implements IStorage {
         return false;
       }
 
-      // Hash the new password
-      const bcrypt = await import('bcryptjs');
-      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      // Hash the new password using the same method as registration
+      console.log("[STORAGE] verifyPasswordReset - Hashing new password");
+      const { hashPassword } = await import('./auth');
+      const hashedPassword = await hashPassword(newPassword);
 
       // Update password and clear reset token
+      console.log("[STORAGE] verifyPasswordReset - Updating user password in database");
       await db
         .update(users)
         .set({
@@ -575,26 +588,13 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(users.id, user.id));
 
+      console.log("[STORAGE] verifyPasswordReset - Password updated successfully for:", user.email);
       return true;
     } catch (error) {
-      console.error("Error verifying password reset:", error);
+      console.error("[STORAGE] Error verifying password reset:", error);
       return false;
     }
   }
-
-  // Feedback operations
-  async createFeedback(feedbackData: InsertFeedback & { userId: number }): Promise<Feedback> {
-    const [newFeedback] = await db
-      .insert(feedback)
-      .values({
-        ...feedbackData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .returning();
-    return newFeedback;
-  }
-
   async getFeedback(userId: number): Promise<Feedback[]> {
     return await db
       .select()
