@@ -635,7 +635,7 @@ export default function Inventory() {
                           <SelectValue placeholder="Select brand first" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent position="popper" className="max-h-[200px]">
                         <SelectItem value="AK Interactive">AK Interactive</SelectItem>
                         <SelectItem value="Army Painter">Army Painter</SelectItem>
                         <SelectItem value="Citadel">Citadel</SelectItem>
