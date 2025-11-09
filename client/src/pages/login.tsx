@@ -46,10 +46,10 @@ export default function Login() {
     mutationFn: async (data: LoginForm) => {
       return apiRequest("POST", "/api/auth/login", data);
     },
-    onSuccess: (data) => {
+    onSuccess: (response) => {
       // Store token in localStorage
-      localStorage.setItem("authToken", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("authToken", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
       
       toast({
         title: "Welcome back!",
