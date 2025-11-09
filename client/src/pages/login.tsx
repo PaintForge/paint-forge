@@ -47,9 +47,18 @@ export default function Login() {
       return apiRequest("POST", "/api/auth/login", data);
     },
     onSuccess: (response) => {
+      console.log("Login response:", response);
+      console.log("Token from response:", response.data?.token);
+      console.log("User from response:", response.data?.user);
+      
       // Store token in localStorage
-      localStorage.setItem("authToken", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+      if (response.data && response.data.token) {
+        localStorage.setItem("authToken", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        console.log("Token stored in localStorage:", localStorage.getItem("authToken"));
+      } else {
+        console.error("No token in response!", response);
+      }
       
       toast({
         title: "Welcome back!",
