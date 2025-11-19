@@ -817,3 +817,75 @@ export default function Inventory() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Priority</FormLabel>
+                          <FormControl>
+                            <Select onValueChange={field.onChange} defaultValue="medium">
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="high">High Priority</SelectItem>
+                                <SelectItem value="medium">Medium Priority</SelectItem>
+                                <SelectItem value="low">Low Priority</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes (optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Why do you want this paint?"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => safeSetIsAddDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type={!isAuthenticated ? "button" : "submit"}
+                  onClick={!isAuthenticated ? () => {
+                    toast({
+                      title: "Account Required",
+                      description: "Please sign up for a free account to save your paint inventory.",
+                      variant: "destructive",
+                    });
+                    setTimeout(() => {
+                      setLocation("/register");
+                    }, 2000);
+                  } : undefined}
+                  disabled={addPaintMutation.isPending}
+                  className="bg-orange-500 hover:bg-orange-600 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {!isAuthenticated ? "Sign up to save" : addPaintMutation.isPending ? "Adding..." : "Add Paint"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
