@@ -128,6 +128,25 @@
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
   }
 
+  /* Toast notification solid backgrounds */
+  [data-sonner-toast],
+  [data-radix-toast-viewport] > * {
+    background: rgba(15, 15, 15, 0.98) !important;
+    backdrop-filter: blur(15px);
+  }
+  
+  /* Default toast styling */
+  [data-radix-toast-viewport] > *:not(.destructive) {
+    background: rgba(15, 15, 15, 0.98) !important;
+    border: 1px solid rgba(255, 107, 53, 0.3) !important;
+  }
+  
+  /* Destructive/error toast styling */
+  [data-radix-toast-viewport] > *.destructive {
+    background: rgba(20, 10, 10, 0.98) !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+  }
+
   .white-text-shadow {
     text-shadow: 
       0 0 8px rgba(0, 0, 0, 1),
@@ -343,3 +362,5 @@ html body div form div div input[type="password"]:-ms-input-placeholder {
     min-height: 50px;
   }
 }
+
+
