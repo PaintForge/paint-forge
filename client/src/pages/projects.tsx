@@ -93,29 +93,19 @@ export default function Projects() {
   
   const isAuthenticated = !!user && !isUserLoading;
   
-  console.log('PROJECTS: User data:', user);
-  console.log('PROJECTS: isAuthenticated:', isAuthenticated);
   
   // Prevent dialog from opening for unauthenticated users
   const safeSetIsDialogOpen = (open: boolean) => {
-    console.log('PROJECTS: safeSetIsDialogOpen called with:', open, 'isAuthenticated:', isAuthenticated);
     if (!isAuthenticated && open) {
-      console.log('PROJECTS: Dialog open blocked for unauthenticated user');
       return; // Prevent dialog from opening
     }
-    console.log('PROJECTS: Dialog state changed to:', open);
     setIsDialogOpen(open);
   };
   
-  // Track dialog state changes
-  useEffect(() => {
-    console.log('Dialog state changed to:', isDialogOpen);
-  }, [isDialogOpen]);
 
   // Set video source when camera stream is available
   useEffect(() => {
     if (videoRef.current && cameraStream && isCameraOpen) {
-      console.log('Setting video source:', cameraStream);
       videoRef.current.srcObject = cameraStream;
       
       // Ensure video plays
@@ -175,7 +165,6 @@ export default function Projects() {
 
   const handleImageCapture = async () => {
     try {
-      console.log('Requesting camera access...');
       
       // First check if camera is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -183,12 +172,12 @@ export default function Projects() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true,
+        video: { 
+          facingMode: { exact: "environment" }
+        },
         audio: false
       });
       
-      console.log('Camera stream obtained:', stream);
-      console.log('Video tracks:', stream.getVideoTracks());
       
       // Set stream first, then open modal
       setCameraStream(stream);
@@ -197,7 +186,6 @@ export default function Projects() {
       // Ensure video element gets the stream after modal opens
       setTimeout(() => {
         if (videoRef.current && stream) {
-          console.log('Assigning stream to video element');
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(console.error);
         }
@@ -214,16 +202,12 @@ export default function Projects() {
   };
 
   const handleCapturePhoto = () => {
-    console.log('Capture photo clicked');
     if (!videoRef.current || !cameraStream) {
-      console.log('Missing video ref or camera stream');
       return;
     }
 
     try {
       const video = videoRef.current;
-      console.log('Video dimensions:', video.videoWidth, 'x', video.videoHeight);
-      console.log('Video ready state:', video.readyState);
       
       if (video.videoWidth === 0 || video.videoHeight === 0) {
         toast({
@@ -251,27 +235,17 @@ export default function Projects() {
       context.drawImage(video, 0, 0);
       
       const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      console.log('Image captured, data URL length:', imageDataUrl.length);
-      
-      console.log('Setting captured image and form value...');
       setCapturedImage(imageDataUrl);
       form.setValue('imageUrl', imageDataUrl);
       
-      console.log('Dialog open state before camera close:', isDialogOpen);
       
       // Close camera but keep the main dialog open
       if (cameraStream) {
-        console.log('Stopping camera stream...');
         cameraStream.getTracks().forEach(track => track.stop());
         setCameraStream(null);
       }
       setIsCameraOpen(false);
-      console.log('Camera closed, dialog should still be open');
       
-      // Check dialog state after a small delay
-      setTimeout(() => {
-        console.log('Dialog open state after camera close:', isDialogOpen);
-      }, 100);
       
       toast({
         title: "Photo Captured",
@@ -288,7 +262,6 @@ export default function Projects() {
   };
 
   const handleCloseCamera = () => {
-    console.log('Close camera clicked');
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
@@ -315,7 +288,6 @@ export default function Projects() {
           const maxHeight = 400;
           let { width, height } = img;
           
-          console.log(`Original image dimensions: ${width}x${height}`);
           
           if (width > maxWidth || height > maxHeight) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
@@ -323,7 +295,6 @@ export default function Projects() {
             height = Math.floor(height * ratio);
           }
           
-          console.log(`Resized dimensions: ${width}x${height}`);
           
           canvas.width = width;
           canvas.height = height;
@@ -338,19 +309,16 @@ export default function Projects() {
           
           // Calculate base64 size in MB
           const sizeInMB = dataUrl.length / 1024 / 1024;
-          console.log(`Initial compressed size: ${sizeInMB.toFixed(2)}MB`);
           
           // Reduce quality aggressively if still too large (aim for under 5MB base64)
           while (dataUrl.length > 5 * 1024 * 1024 && quality > 0.1) {
             quality -= 0.05;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
             const newSizeMB = dataUrl.length / 1024 / 1024;
-            console.log(`Reduced quality to ${quality.toFixed(2)}, size: ${newSizeMB.toFixed(2)}MB`);
           }
           
           // Final size check
           const finalSizeMB = dataUrl.length / 1024 / 1024;
-          console.log(`Final compressed size: ${finalSizeMB.toFixed(2)}MB`);
           
           // Clean up object URL
           URL.revokeObjectURL(img.src);
@@ -398,13 +366,11 @@ export default function Projects() {
     }
     
     try {
-      console.log(`Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
       const compressedDataUrl = await compressImage(file);
       
       // Log final base64 string size
       const base64Size = compressedDataUrl.length;
       const estimatedMB = (base64Size / 1024 / 1024).toFixed(2);
-      console.log(`Compressed base64 size: ${estimatedMB}MB (${base64Size} characters)`);
       
       setCapturedImage(compressedDataUrl);
       form.setValue('imageUrl', compressedDataUrl);
@@ -432,7 +398,6 @@ export default function Projects() {
   };
 
   const resetForm = () => {
-    console.log('resetForm called - this might be closing the dialog');
     form.reset();
     setCapturedImage(null);
     if (fileInputRef.current) {
@@ -731,10 +696,8 @@ Shared from The Paint Forge - Never forget what paints you used!`;
             onOpenChange={(open) => {
               // Prevent dialog from closing when camera is open
               if (!open && isCameraOpen) {
-                console.log('Preventing dialog close because camera is open');
                 return;
               }
-              console.log('Dialog onOpenChange called:', open);
               safeSetIsDialogOpen(open);
             }}
           >
@@ -1087,7 +1050,6 @@ Shared from The Paint Forge - Never forget what paints you used!`;
           style={{ pointerEvents: 'auto' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              console.log('Background clicked, closing camera');
               handleCloseCamera();
             }
           }}
@@ -1113,11 +1075,8 @@ Shared from The Paint Forge - Never forget what paints you used!`;
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Capture button clicked with Button component');
                   handleCapturePhoto();
                 }}
-                onMouseDown={() => console.log('Capture button mouse down')}
-                onMouseUp={() => console.log('Capture button mouse up')}
                 className="bg-orange-500 hover:bg-orange-600 text-white"
                 type="button"
               >
@@ -1127,11 +1086,8 @@ Shared from The Paint Forge - Never forget what paints you used!`;
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Cancel button clicked with Button component');
                   handleCloseCamera();
                 }}
-                onMouseDown={() => console.log('Cancel button mouse down')}
-                onMouseUp={() => console.log('Cancel button mouse up')}
                 variant="secondary"
                 className="bg-gray-500 hover:bg-gray-600 text-white"
                 type="button"
