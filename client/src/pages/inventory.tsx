@@ -410,9 +410,9 @@ export default function Inventory() {
 
       {/* Search and Filters */}
       <Card className="glass-morphism border-orange-500/20">
-        <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-end">
-            <div className="flex-1">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col gap-4">
+            <div className="w-full">
               <Label htmlFor="search">Search Paints</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -426,71 +426,70 @@ export default function Inventory() {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex gap-2">
-                <Select value={brandFilter} onValueChange={setBrandFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Brands</SelectItem>
-                    {brands.filter(brand => brand && brand.trim() !== "").map(brand => (
-                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {types.filter(type => type && type.trim() !== "").map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="brand">Brand</SelectItem>
-                    <SelectItem value="type">Type</SelectItem>
-                    <SelectItem value="quantity">Quantity</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full">
+              <Select value={brandFilter} onValueChange={setBrandFilter}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="Brands" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Brands</SelectItem>
+                  {brands.filter(brand => brand && brand.trim() !== "").map(brand => (
+                    <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const newSelectionMode = !selectionMode;
-                    setSelectionMode(newSelectionMode);
-                    if (!newSelectionMode) {
-                      // Clear selections when exiting selection mode
-                      setSelectedPaints(new Set());
-                    }
-                  }}
-                  className={selectionMode ? "bg-orange-500/20 border-orange-500" : ""}
-                  title={selectionMode ? "Exit selection mode" : "Enable selection mode"}
-                >
-                  <CheckCircle className={`w-4 h-4 mr-1 ${selectionMode ? "text-orange-500" : ""}`} />
-                  {selectionMode ? "Exit Select" : "Select"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                >
-                  {viewMode === "grid" ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-                </Button>
-              </div>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {types.filter(type => type && type.trim() !== "").map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue placeholder="Name" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="brand">Brand</SelectItem>
+                  <SelectItem value="type">Type</SelectItem>
+                  <SelectItem value="quantity">Quantity</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newSelectionMode = !selectionMode;
+                  setSelectionMode(newSelectionMode);
+                  if (!newSelectionMode) {
+                    // Clear selections when exiting selection mode
+                    setSelectedPaints(new Set());
+                  }
+                }}
+                className={`flex-1 sm:flex-initial ${selectionMode ? "bg-orange-500/20 border-orange-500" : ""}`}
+                title={selectionMode ? "Exit selection mode" : "Enable selection mode"}
+              >
+                <CheckCircle className={`w-4 h-4 mr-1 ${selectionMode ? "text-orange-500" : ""}`} />
+                {selectionMode ? "Exit Select" : "Select"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+                className="flex-1 sm:flex-initial"
+              >
+                {viewMode === "grid" ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -818,75 +817,3 @@ export default function Inventory() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Priority</FormLabel>
-                          <FormControl>
-                            <Select onValueChange={field.onChange} defaultValue="medium">
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select priority" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="high">High Priority</SelectItem>
-                                <SelectItem value="medium">Medium Priority</SelectItem>
-                                <SelectItem value="low">Low Priority</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Notes (optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              value={field.value || ""}
-                              placeholder="Why do you want this paint?"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => safeSetIsAddDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type={!isAuthenticated ? "button" : "submit"}
-                  onClick={!isAuthenticated ? () => {
-                    toast({
-                      title: "Account Required",
-                      description: "Please sign up for a free account to save your paint inventory.",
-                      variant: "destructive",
-                    });
-                    setTimeout(() => {
-                      setLocation("/register");
-                    }, 2000);
-                  } : undefined}
-                  disabled={addPaintMutation.isPending}
-                  className="bg-orange-500 hover:bg-orange-600 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {!isAuthenticated ? "Sign up to save" : addPaintMutation.isPending ? "Adding..." : "Add Paint"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
-  );
-}
