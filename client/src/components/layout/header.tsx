@@ -14,6 +14,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  accountName?: string;
   emailVerified: boolean;
   profileImageUrl?: string;
   isAdmin?: boolean;
@@ -67,10 +68,26 @@ export default function Header() {
   };
 
   const getUserInitials = () => {
-    if (!user || !user.firstName || !user.lastName) return "U";
-    const firstInitial = user.firstName.charAt(0).toUpperCase();
-    const lastInitial = user.lastName.charAt(0).toUpperCase();
-    return firstInitial + lastInitial;
+    if (!user) return "U";
+    
+    // If user has first and last name, use both initials
+    if (user.firstName && user.lastName) {
+      const firstInitial = user.firstName.charAt(0).toUpperCase();
+      const lastInitial = user.lastName.charAt(0).toUpperCase();
+      return firstInitial + lastInitial;
+    }
+    
+    // Fall back to account name's first letter
+    if (user.accountName && user.accountName.length > 0) {
+      return user.accountName.charAt(0).toUpperCase();
+    }
+    
+    // Last resort: use email's first letter
+    if (user.email && user.email.length > 0) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    
+    return "U";
   };
 
   const navigation = [
