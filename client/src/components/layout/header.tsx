@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../ui/button";
@@ -22,7 +22,37 @@ interface User {
 export default function Header() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const isAuthenticated = !!getAuthToken();
+  const [authToken, setAuthToken] = useState<string | null>(getAuthToken());
+  
+  // Listen for auth changes (localStorage updates and custom events)
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = getAuthToken();
+      setAuthToken(token);
+    };
+    
+    // Check on mount and location change
+    checkAuth();
+    
+    // Listen for storage events (from other tabs)
+    window.addEventListener('storage', checkAuth);
+    
+    // Listen for custom auth change events (from same tab login)
+    window.addEventListener('authChange', checkAuth);
+    
+    // Poll for changes as a fallback (every 500ms for 5 seconds after mount)
+    const pollInterval = setInterval(checkAuth, 500);
+    const pollTimeout = setTimeout(() => clearInterval(pollInterval), 5000);
+    
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+      window.removeEventListener('authChange', checkAuth);
+      clearInterval(pollInterval);
+      clearTimeout(pollTimeout);
+    };
+  }, [location]);
+  
+  const isAuthenticated = !!authToken;
 
   // Fetch user data if authenticated
   const { data: user } = useQuery<User>({
