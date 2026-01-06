@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Link, useLocation } from "wouter";
 import { Shield, Mail, Lock, AlertCircle, Eye, EyeOff, CheckCircle } from "lucide-react";
-import { apiRequest } from "../lib/queryClient";
+import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { loginSchema } from "@shared/schema";
 import type { z } from "zod";
@@ -17,7 +17,7 @@ import type { z } from "zod";
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const [, setLocation] = useLocation();
+  useLocation(); // Keep hook for URL params detection
   const { toast } = useToast();
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
@@ -56,6 +56,13 @@ export default function Login() {
         localStorage.setItem("authToken", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
         console.log("Token stored in localStorage:", localStorage.getItem("authToken"));
+        
+        // Dispatch custom event to notify Header about auth change
+        window.dispatchEvent(new Event('authChange'));
+        
+        // Invalidate all queries to force refetch with new token
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
       } else {
         console.error("No token in response!", response);
       }
@@ -65,7 +72,11 @@ export default function Login() {
         description: "You have been logged in successfully.",
       });
       
-      setLocation("/");
+      // Use full page navigation to ensure Header gets fresh auth state
+      // Small delay to ensure toast shows and localStorage is written
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 100);
     },
     onError: (error: any) => {
       // Convert technical error messages to user-friendly ones
