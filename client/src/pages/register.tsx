@@ -7,8 +7,9 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Alert, AlertDescription } from "../components/ui/alert";
+import { Checkbox } from "../components/ui/checkbox";
 import { Link } from "wouter";
-import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Eye, EyeOff, RefreshCw, ShieldAlert } from "lucide-react";
 import { apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { registerSchema } from "@shared/schema";
@@ -23,6 +24,7 @@ export default function Register() {
   const [success, setSuccess] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [captcha, setCaptcha] = useState<CaptchaData>(generateCaptcha());
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -95,6 +97,10 @@ export default function Register() {
   });
 
   const onSubmit = (data: RegisterForm) => {
+    if (!agreedToTerms) {
+      setError("You must agree to the community guidelines to create an account.");
+      return;
+    }
     setError("");
     setSuccess("");
     registerMutation.mutate(data);
@@ -259,10 +265,40 @@ export default function Register() {
                   )}
                 />
 
+                {/* Community Guidelines Agreement */}
+                <div className="space-y-3 p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <ShieldAlert className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-semibold text-foreground mb-2">Community Guidelines</p>
+                      <p>
+                        By creating an account, you agree that no sexually explicit, degrading, 
+                        or offensive account names or images will be uploaded. Violators will 
+                        have their accounts immediately removed without warning.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="terms" 
+                      checked={agreedToTerms}
+                      onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+                      className="border-orange-500/50 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                      data-testid="checkbox-agree-terms"
+                    />
+                    <label 
+                      htmlFor="terms" 
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      I agree to the community guidelines
+                    </label>
+                  </div>
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-orange-500 hover:bg-orange-600 text-black font-semibold"
-                  disabled={registerMutation.isPending}
+                  disabled={registerMutation.isPending || !agreedToTerms}
                 >
                   {registerMutation.isPending ? "Creating Account..." : "Create Account"}
                 </Button>
