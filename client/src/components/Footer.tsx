@@ -3,6 +3,15 @@ import { Link } from "wouter";
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const navigateToContactForm = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.location.href = '/help#contact-support';
+  };
+
   return (
     <footer className="bg-black/50 border-t border-orange-500/20 mt-auto">
       <div className="container mx-auto px-4 py-8">
@@ -25,16 +34,16 @@ export function Footer() {
           <div className="space-y-4">
             <h4 className="font-semibold text-white">Quick Links</h4>
             <div className="space-y-2 text-sm">
-              <Link href="/inventory" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/inventory" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Paint Database
               </Link>
-              <Link href="/projects" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/projects" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Miniature Showcase
               </Link>
-              <Link href="/help" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/help" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Help Center
               </Link>
-              <Link href="/profile" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/profile" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 User Profile
               </Link>
             </div>
@@ -44,16 +53,16 @@ export function Footer() {
           <div className="space-y-4">
             <h4 className="font-semibold text-white">Resources</h4>
             <div className="space-y-2 text-sm">
-              <Link href="/privacy-policy" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/privacy-policy" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms-of-service" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/terms-of-service" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Terms of Service
               </Link>
-              <Link href="/privacy-policy" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <Link href="/privacy-policy" onClick={scrollToTop} className="block text-muted-foreground hover:text-orange-500 transition-colors">
                 Cookie Policy
               </Link>
-              <a href="mailto:support@paintforge.app" className="block text-muted-foreground hover:text-orange-500 transition-colors">
+              <a href="/help#contact-support" onClick={navigateToContactForm} className="block text-muted-foreground hover:text-orange-500 transition-colors cursor-pointer">
                 Contact Us
               </a>
             </div>
