@@ -491,7 +491,7 @@ export default function Help() {
                   placeholder="Enter your name"
                   value={supportForm.name}
                   onChange={(e) => setSupportForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="bg-[rgba(15,15,15,0.98)] border-orange-500/20"
+                  className="dark-input bg-[rgba(15,15,15,0.98)] border-orange-500/20 text-white placeholder:text-gray-400"
                   data-testid="input-support-name"
                 />
               </div>
