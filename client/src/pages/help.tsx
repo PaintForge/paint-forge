@@ -503,7 +503,7 @@ export default function Help() {
                   placeholder="you@example.com"
                   value={supportForm.email}
                   onChange={(e) => setSupportForm(prev => ({ ...prev, email: e.target.value }))}
-                  className="bg-[rgba(15,15,15,0.98)] border-orange-500/20"
+                  className="bg-[rgba(15,15,15,0.98)] border-orange-500/20 text-white placeholder:text-gray-400 [&:-webkit-autofill]:bg-[rgba(15,15,15,0.98)] [&:-webkit-autofill]:text-white [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0px_1000px_rgba(15,15,15,0.98)_inset]"
                   data-testid="input-support-email"
                 />
               </div>
