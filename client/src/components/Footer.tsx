@@ -9,7 +9,18 @@ export function Footer() {
 
   const navigateToContactForm = (e: React.MouseEvent) => {
     e.preventDefault();
-    window.location.href = '/help#contact-support';
+    const currentPath = window.location.pathname;
+    
+    if (currentPath === '/help') {
+      // Already on help page, just scroll to the element
+      const element = document.getElementById('contact-support');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else {
+      // Navigate to help page, then scroll after page loads
+      window.location.href = '/help#contact-support';
+    }
   };
 
   return (
