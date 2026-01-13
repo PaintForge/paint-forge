@@ -435,7 +435,7 @@ export default function Help() {
       </div>
 
       {/* Contact Support Form */}
-      <Card className="glass-morphism border-orange-500/20">
+      <Card id="contact-support" className="glass-morphism border-orange-500/20 scroll-mt-20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="w-5 h-5" />
