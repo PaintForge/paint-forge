@@ -35,18 +35,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
+      console.log("[RESET-PASSWORD] Request received");
       const validatedData = resetPasswordSchema.parse(req.body);
+      console.log("[RESET-PASSWORD] Token (first 8 chars):", validatedData.token?.substring(0, 8));
+      console.log("[RESET-PASSWORD] Password length:", validatedData.password?.length);
       
       const success = await storage.verifyPasswordReset(validatedData.token, validatedData.password);
       
       if (!success) {
+        console.log("[RESET-PASSWORD] Reset failed - invalid or expired token");
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
       
+      console.log("[RESET-PASSWORD] Password reset successful");
       res.json({
         message: "Password reset successfully. You can now log in with your new password.",
       });
     } catch (error: any) {
+      console.error("[RESET-PASSWORD] Error:", error);
       res.status(400).json({ message: error.message || "Password reset failed" });
     }
   });
@@ -416,6 +422,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(feedback);
     } catch (error: any) {
       res.status(400).json({ message: error.message || "Failed to submit feedback" });
+    }
+  });
+
+  // Public support contact form (no auth required - for login issues)
+  app.post('/api/support', async (req, res) => {
+    try {
+      const { category, email, name, message } = req.body;
+      
+      // Validate required fields
+      if (!category || !email || !name || !message) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ message: "Invalid email address" });
+      }
+      
+      // Validate category
+      const validCategories = ['account-login', 'feature-suggestion', 'bug-report', 'inappropriate-content', 'other'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ message: "Invalid category" });
+      }
+      
+      // Validate message length
+      if (message.length < 10) {
+        return res.status(400).json({ message: "Message must be at least 10 characters" });
+      }
+      
+      if (message.length > 2000) {
+        return res.status(400).json({ message: "Message must be less than 2000 characters" });
+      }
+      
+      // Send email via SendGrid
+      const { sendSupportRequest } = await import('./email');
+      const success = await sendSupportRequest(category, email, name, message);
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to send support request. Please try again later." });
+      }
+      
+      res.status(200).json({ message: "Support request sent successfully" });
+    } catch (error: any) {
+      console.error('Support request error:', error);
+      res.status(500).json({ message: "Failed to submit support request" });
     }
   });
 
