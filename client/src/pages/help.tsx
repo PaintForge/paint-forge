@@ -272,17 +272,25 @@ export default function Help() {
     setIsSubmitting(true);
     
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch('/api/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(supportForm)
+        body: JSON.stringify(supportForm),
+        signal: controller.signal
       });
       
-      const data = await response.json();
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.message || 'Failed to send support request');
       }
+      
+      // Try to parse response, but don't fail if it doesn't work
+      await response.json().catch(() => ({}));
       
       toast({
         title: "Request Sent",
@@ -291,11 +299,20 @@ export default function Help() {
       
       setSupportForm({ category: "", name: "", email: "", message: "" });
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send support request. Please try again.",
-        variant: "destructive"
-      });
+      // Check if it was an abort/timeout error
+      if (error.name === 'AbortError') {
+        toast({
+          title: "Request Timeout",
+          description: "The request took too long. Your message may have been sent - please check your email before trying again.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to send support request. Please try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
