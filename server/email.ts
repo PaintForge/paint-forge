@@ -51,16 +51,16 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     // Layer 1: Create fresh SendGrid instance with timeout
     const customMailService = new MailService();
     customMailService.setApiKey(process.env.SENDGRID_API_KEY);
-    customMailService.setTimeout(8000); // 8 second HTTP timeout
+    customMailService.setTimeout(25000); // 25 second HTTP timeout (increased for production)
     
     // Layer 2: Promise-based timeout wrapper
     const sendWithTimeout = () => {
       return new Promise((resolve, reject) => {
-        // Set up the timeout first
+        // Set up the timeout first - 30 seconds to allow SendGrid to complete
         const timeoutId = setTimeout(() => {
-          console.log('❌ SendGrid timeout after 10 seconds - forcing rejection');
-          reject(new Error('SendGrid timeout: Connection took longer than 10 seconds'));
-        }, 10000);
+          console.log('❌ SendGrid timeout after 30 seconds - forcing rejection');
+          reject(new Error('SendGrid timeout: Connection took longer than 30 seconds'));
+        }, 30000);
         
         // Attempt to send
         customMailService.send(sendGridMessage)
@@ -381,6 +381,138 @@ export async function sendTestEmail(email: string, subject: string, htmlContent:
   }
 }
 
+export async function sendSupportRequest(
+  category: string,
+  email: string,
+  name: string,
+  message: string
+): Promise<boolean> {
+  try {
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const categoryLabels: Record<string, string> = {
+      'account-login': 'Account / Login Issue',
+      'feature-suggestion': 'Feature Request / Suggestion',
+      'bug-report': 'Bug Report',
+      'inappropriate-content': 'Report Inappropriate Content',
+      'other': 'General Support'
+    };
+    
+    const categoryLabel = categoryLabels[category] || category;
+
+    const emailParams: EmailParams = {
+      to: 'paulkocumcmg@gmail.com', // Your monitored email
+      from: 'no-reply@paintsforge.com',
+      subject: `[Support Request] ${categoryLabel} - from ${name}`,
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Paint Forge Support Request</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #1a1a1a; font-family: Arial, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background: #2d2d2d; border-radius: 12px; overflow: hidden; border: 2px solid #ff6b35;">
+            
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #ff6b35 0%, #dc2626 100%); padding: 30px 20px; text-align: center;">
+              <h1 style="margin: 0; color: white; font-size: 24px; font-weight: bold;">
+                Paint Forge Support Request
+              </h1>
+              <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">
+                ${categoryLabel}
+              </p>
+            </div>
+            
+            <!-- Main Content -->
+            <div style="padding: 30px; background: #1a1a1a;">
+              
+              <!-- Request Details -->
+              <div style="background: #2d2d2d; border: 1px solid #ff6b35; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #ff6b35; margin: 0 0 15px 0; font-size: 18px;">Request Details</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="color: #999; padding: 8px 0; width: 100px;">Name:</td>
+                    <td style="color: #fff; padding: 8px 0;">${name}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #999; padding: 8px 0;">Email:</td>
+                    <td style="color: #fff; padding: 8px 0;"><a href="mailto:${email}" style="color: #ff6b35;">${email}</a></td>
+                  </tr>
+                  <tr>
+                    <td style="color: #999; padding: 8px 0;">Category:</td>
+                    <td style="color: #fff; padding: 8px 0;">${categoryLabel}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #999; padding: 8px 0;">Date:</td>
+                    <td style="color: #fff; padding: 8px 0;">${currentDate}</td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Message -->
+              <div style="background: #2d2d2d; border: 1px solid #444; border-radius: 8px; padding: 20px;">
+                <h3 style="color: #ff6b35; margin: 0 0 15px 0; font-size: 18px;">Message</h3>
+                <p style="color: #e5e5e5; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message}</p>
+              </div>
+              
+              <!-- Reply Button -->
+              <div style="text-align: center; margin-top: 25px;">
+                <a href="mailto:${email}?subject=Re: ${categoryLabel} - Paint Forge Support" 
+                   style="background: #ff6b35; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold; display: inline-block;">
+                  Reply to ${name}
+                </a>
+              </div>
+              
+            </div>
+            
+            <!-- Footer -->
+            <div style="background: #0a0a0a; padding: 20px; text-align: center; border-top: 1px solid #333;">
+              <p style="font-size: 12px; color: #666; margin: 0;">
+                Paint Forge Support System | paintsforge.com
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+PAINT FORGE SUPPORT REQUEST
+============================
+
+Category: ${categoryLabel}
+Date: ${currentDate}
+
+FROM:
+Name: ${name}
+Email: ${email}
+
+MESSAGE:
+${message}
+
+---
+Reply to: ${email}
+      `
+    };
+
+    const success = await sendEmail(emailParams);
+    if (success) {
+      console.log(`✅ Support request sent to paulkocumcmg@gmail.com via SendGrid`);
+    }
+    return success;
+  } catch (error) {
+    console.error('❌ Failed to send support request via SendGrid:', error);
+    return false;
+  }
+}
+
 export async function sendFeedbackNotification(
   feedbackType: string, 
   message: string, 
@@ -483,105 +615,112 @@ export async function sendFeedbackNotification(
                   </h4>
                   <div style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 6px; border-left: 4px solid #fbbf24;">
                     <p style="color: #fbbf24; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); line-height: 1.6; font-size: 15px;">
-                      <strong>Priority:</strong> Review and respond to Battle-Brother within 24-48 hours to maintain forge morale and operational efficiency.
+                      <strong>Mission Objective:</strong> Respond to Battle-Brother <strong>${userName}</strong> at communication frequency <strong>${userEmail}</strong><br>
+                      <strong>Priority Level:</strong> Standard Response Protocol<br>
+                      <strong>Time Limit:</strong> Within 24-48 hours for optimal service
                     </p>
                   </div>
                 </div>
                 
-                <!-- Response CTA -->
+                <!-- Direct Response Link -->
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="mailto:${userEmail}" 
+                  <a href="mailto:${userEmail}?subject=Re: ${feedbackType} - Paint Forge Response" 
                      style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); 
                             color: white; 
                             text-decoration: none; 
-                            padding: 16px 40px; 
+                            padding: 16px 32px; 
                             border-radius: 8px; 
-                            font-weight: bold; 
-                            font-family: 'Cinzel', serif;
+                            font-weight: 600; 
                             display: inline-block;
+                            font-family: 'Cinzel', serif;
                             font-size: 16px;
                             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
                             border: 2px solid rgba(5, 150, 105, 0.5);
-                            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);">
+                            box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+                            transition: all 0.3s ease;">
                     📧 INITIATE RESPONSE PROTOCOL 📧
                   </a>
                 </div>
                 
                 <!-- Divider -->
-                <div style="height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(255, 107, 53, 0.4) 50%, transparent 100%); margin: 30px 0;"></div>
-                
-                <!-- Mission Stats Footer -->
-                <div style="text-align: center;">
-                  <p style="color: #6b7280; font-size: 14px; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); line-height: 1.6;">
-                    <strong style="color: #ff6b35;">Paint Forge Operations Center</strong><br>
-                    Monitoring all communications channels for optimal Battle-Brother support
-                  </p>
-                </div>
+                <hr style="border: none; border-top: 2px solid rgba(5, 150, 105, 0.3); margin: 30px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.5);">
               </div>
             </div>
             
-            <!-- Footer -->
-            <div style="background: #0a0a0a; padding: 25px 30px; border-top: 2px solid rgba(5, 150, 105, 0.3); text-align: center;">
-              <p style="font-size: 12px; color: #555; line-height: 1.6; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
-                <strong style="color: #ff6b35;">The Paint Forge LLC</strong><br>
-                1234 Miniature Way, Suite 567 • Battle Creek, MI 49037, USA<br>
-                support@paintsforge.com • (555) 123-PAINT
-              </p>
-              <p style="font-size: 11px; color: #444; margin: 10px 0 0 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
-                © 2025 The Paint Forge LLC. All rights reserved.<br>
-                This is an automated notification from your feedback management system.
-              </p>
+            <!-- Footer with Required Legal Elements -->
+            <div style="background: rgba(10, 10, 10, 0.95); padding: 25px 30px; border-top: 1px solid rgba(5, 150, 105, 0.3); text-align: center;">
+              <div style="margin-bottom: 15px;">
+                <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                  <strong style="color: #ff6b35;">The Paint Forge</strong> - Command & Communication Center<br>
+                  Facilitating communication between the Forge leadership and Battle-Brothers.
+                </p>
+              </div>
+              
+              <div style="border-top: 1px solid rgba(5, 150, 105, 0.2); padding-top: 15px; margin-top: 15px;">
+                <p style="font-size: 12px; color: #666; line-height: 1.4; margin: 5px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                  <strong>The Paint Forge LLC</strong><br>
+                  1234 Miniature Way, Suite 567<br>
+                  Battle Creek, MI 49037, USA<br>
+                  Email: support@paintsforge.com | Phone: (555) 123-PAINT<br><br>
+                  This internal system notification from ${userEmail}.<br>
+                  Internal Admin System | 
+                  <a href="${process.env.BASE_URL || 'http://localhost:5000'}/privacy-policy" style="color: #ff6b35; text-decoration: none;">Privacy Policy</a> | 
+                  <a href="${process.env.BASE_URL || 'http://localhost:5000'}/terms-of-service" style="color: #ff6b35; text-decoration: none;">Terms of Service</a>
+                </p>
+                <p style="font-size: 11px; color: #555; margin: 10px 0 0 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+                  © 2025 The Paint Forge LLC. All rights reserved. | CAN-SPAM Act Compliant
+                </p>
+              </div>
             </div>
           </div>
         </body>
         </html>
       `,
       text: `
-📡 THE PAINT FORGE - INCOMING TRANSMISSION 📬
+📰 THE PAINT FORGE - FEEDBACK TRANSMISSION 📬
 
-==================================================
-BATTLE-BROTHER FEEDBACK REPORT
-==================================================
+📨 INCOMING TRANSMISSION FROM BATTLE-BROTHER
 
-REPORT TYPE: ${feedbackType}
-SUBMITTED BY: ${userName}
-CONTACT: ${userEmail}
-TIMESTAMP: ${currentDate}
+FEEDBACK REPORT: ${feedbackType}
 
---------------------------------------------------
+BATTLE-BROTHER INTELLIGENCE:
+- Call Sign: ${userName}
+- Comm Frequency: ${userEmail}
+- Transmission Time: ${currentDate}
+- Classification: ${feedbackType}
+
 TRANSMISSION CONTENT:
---------------------------------------------------
-
 ${message}
 
-==================================================
-COMMAND DIRECTIVE:
-==================================================
+⚡ COMMAND DIRECTIVE:
+Mission Objective: Respond to Battle-Brother ${userName} at ${userEmail}
+Priority Level: Standard Response Protocol
+Time Limit: Within 24-48 hours for optimal service
 
-Priority: Review and respond within 24-48 hours to maintain forge morale and operational efficiency.
+DIRECT RESPONSE: Reply to ${userEmail}
 
-RESPONSE PROTOCOL:
-Reply directly to ${userEmail}
-
---------------------------------------------------
-Paint Forge Operations Center
+-------------------------------------------
+The Paint Forge LLC - Internal Admin System
 1234 Miniature Way, Suite 567
 Battle Creek, MI 49037, USA
 Email: support@paintsforge.com
 Phone: (555) 123-PAINT
 
-© 2025 The Paint Forge LLC
-==================================================
+Privacy Policy: ${process.env.BASE_URL || 'http://localhost:5000'}/privacy-policy
+Terms of Service: ${process.env.BASE_URL || 'http://localhost:5000'}/terms-of-service
+
+This is an automated internal notification.
+© 2025 The Paint Forge LLC - CAN-SPAM Act Compliant
       `
     };
 
     const success = await sendEmail(emailParams);
     if (success) {
-      console.log(`✅ Feedback notification sent to support@paintsforge.com`);
+      console.log(`✅ Feedback notification sent to support@paintsforge.com via SendGrid`);
     }
     return success;
   } catch (error) {
-    console.error('❌ Failed to send feedback notification:', error);
+    console.error('❌ Failed to send feedback notification via SendGrid:', error);
     return false;
   }
 }
