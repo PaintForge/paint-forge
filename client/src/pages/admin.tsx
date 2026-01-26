@@ -4,7 +4,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../components/ui/alert-dialog";
-import { Users, Palette, FolderOpen, Calendar, TrendingUp, Activity, Shield, ShieldCheck, Trash2 } from "lucide-react";
+import { Users, Palette, FolderOpen, Calendar, TrendingUp, Activity, Shield, ShieldCheck, Trash2, Database, RefreshCw, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { useAuthState } from "../hooks/useAuth";
@@ -102,6 +102,27 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importCatalogMutation = useMutation({
+    mutationFn: async (forceRefresh: boolean) => {
+      return await apiRequest("POST", "/api/admin/import-catalog", { forceRefresh });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/catalog/brands"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({
+        title: "Catalog Import Complete",
+        description: response?.data?.message || `Imported ${response?.data?.count || 0} paints`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import paint catalog",
         variant: "destructive",
       });
     },
@@ -319,6 +340,75 @@ export default function AdminDashboard() {
                 <p className="text-gray-300">No users found</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Paint Catalog Management */}
+        <Card className="glass-morphism border-orange-500/20 mb-6">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center space-x-2">
+              <Database className="w-5 h-5 text-orange-500" />
+              <span>Paint Catalog Management</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-gray-300">
+                Import or refresh the paint catalog from the community database. This includes paints from 
+                Citadel, Vallejo, Army Painter, Scale75, AK Interactive, Reaper, and more.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={() => importCatalogMutation.mutate(false)}
+                  disabled={importCatalogMutation.isPending}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  {importCatalogMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      Import Catalog
+                    </>
+                  )}
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={importCatalogMutation.isPending}
+                      className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Force Refresh
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-slate-900 border-orange-500/20">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-white">Force Refresh Catalog?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-gray-300">
+                        This will delete all existing catalog data and re-import from the source.
+                        This is useful when the community database has been updated with new paints.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-slate-700 text-white border-slate-600 hover:bg-slate-600">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => importCatalogMutation.mutate(true)}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        Force Refresh
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
