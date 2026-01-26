@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Label } from "../components/ui/label";
-import { Search, Filter, Plus, Package, Palette, Grid3X3, List, CheckCircle, Download, BarChart3, Heart, Star, ShoppingCart } from "lucide-react";
+import { Search, Filter, Plus, Package, Palette, Grid3X3, List, CheckCircle, Download, BarChart3, Heart, Star, ShoppingCart, BookOpen } from "lucide-react";
 import PaintCard from "../components/paint/paint-card";
+import PaintCatalog from "../components/paint/paint-catalog";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -38,7 +39,7 @@ export default function Inventory() {
   const [searchSuggestions, setSearchSuggestions] = useState<Paint[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState<"inventory" | "wishlist">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "wishlist" | "catalog">("inventory");
   const [selectionMode, setSelectionMode] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -404,11 +405,30 @@ export default function Inventory() {
           <Heart className="w-4 h-4 mr-2" />
           Wishlist ({totalWishlist})
         </Button>
+        <Button
+          variant={activeTab === "catalog" ? "default" : "ghost"}
+          onClick={() => setActiveTab("catalog")}
+          className={`flex-1 ${activeTab === "catalog" ? "bg-orange-500 hover:bg-orange-600 text-black" : "bg-black hover:bg-gray-800 text-white"}`}
+        >
+          <BookOpen className="w-4 h-4 mr-2" />
+          Catalog
+        </Button>
       </div>
 
 
 
-      {/* Search and Filters */}
+      {/* Catalog Tab Content */}
+      {activeTab === "catalog" && (
+        <PaintCatalog 
+          onPaintAdded={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
+          }}
+          userPaintNames={displayPaints.map(p => `${p.brand}-${p.name}`)}
+        />
+      )}
+
+      {/* Search and Filters - only show for inventory/wishlist tabs */}
+      {activeTab !== "catalog" && (
       <Card className="glass-morphism border-orange-500/20">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col gap-4">
@@ -494,7 +514,11 @@ export default function Inventory() {
           </div>
         </CardContent>
       </Card>
+      )}
 
+      {/* Bulk Actions - only show for inventory/wishlist tabs */}
+      {activeTab !== "catalog" && (
+      <>
       {/* Bulk Actions */}
       {selectionMode && (
         <Card className="glass-morphism border-orange-500/20">
@@ -593,8 +617,8 @@ export default function Inventory() {
           ))}
         </div>
       )}
-
-
+      </>
+      )}
 
       {/* Add Paint Dialog - Completely prevent for unauthenticated users */}
       {isAuthenticated && isAddDialogOpen && (
