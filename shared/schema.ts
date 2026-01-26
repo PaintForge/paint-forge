@@ -65,6 +65,8 @@ export const projectPaints = pgTable("project_paints", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -146,6 +148,28 @@ export type ProjectPaint = typeof projectPaints.$inferSelect & {
   paint?: Paint;
 };
 export type InsertProjectPaint = z.infer<typeof insertProjectPaintSchema>;
+
+// Master Paint Catalog - pre-populated database of all paints from various brands
+export const paintCatalog = pgTable("paint_catalog", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  brand: text("brand").notNull(),
+  type: text("type").notNull(), // Base, Layer, Shade, Contrast, Technical, etc.
+  hexColor: text("hex_color").notNull(),
+  r: integer("r").notNull(),
+  g: integer("g").notNull(),
+  b: integer("b").notNull(),
+  isDiscontinued: boolean("is_discontinued").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaintCatalogSchema = createInsertSchema(paintCatalog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PaintCatalogItem = typeof paintCatalog.$inferSelect;
+export type InsertPaintCatalogItem = z.infer<typeof insertPaintCatalogSchema>;
 
 // Feedback table
 export const feedback = pgTable("feedback", {
