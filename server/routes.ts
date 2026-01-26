@@ -8,6 +8,9 @@ import { insertPaintSchema, registerSchema, loginSchema, forgotPasswordSchema, r
 import { scrapeAllCitadelPaints, scrapeKnownCitadelCategories } from "./citadel-scraper";
 import { getAllCitadelPaints, getCitadelPaintsByType, searchCitadelPaints } from "./citadel-paint-database";
 import { hashPassword, comparePassword, generateToken, requireAuth, sendVerificationEmail, type AuthenticatedRequest } from "./auth";
+import { importAllPaints, getCatalogStats } from "./paintCatalogImport";
+import { paintCatalog } from "@shared/schema";
+import { ilike, or, and } from "drizzle-orm";
 import { sendPasswordResetEmail } from "./email";
 
 
@@ -497,6 +500,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin paint catalog import endpoint
+  app.post('/api/admin/import-catalog', requireAuth, async (req, res) => {
+    try {
+      const authReq = req as AuthenticatedRequest;
+      const user = await storage.getUser(authReq.user!.id);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { forceRefresh = false } = req.body;
+      console.log(`[ADMIN] Paint catalog import requested by ${user.email}, forceRefresh: ${forceRefresh}`);
+      
+      const result = await importAllPaints(forceRefresh);
+      
+      res.json({
+        success: result.success,
+        message: result.message,
+        count: result.count,
+        brands: result.brands,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Paint catalog import error:', error);
+      res.status(500).json({ message: "Failed to import paint catalog", error: error.message });
+    }
+  });
+
   // Admin user management routes
   app.get("/api/admin/users", requireAuth, async (req: AuthenticatedRequest, res) => {
     // Check if user is admin
@@ -897,6 +927,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to import Citadel paint data",
         error: error.message 
       });
+    }
+  });
+
+  // Paint Catalog routes - pre-populated database of all paints
+  app.get("/api/catalog/brands", async (req, res) => {
+    try {
+      const allPaints = await db.select().from(paintCatalog);
+      
+      const brandCounts: Record<string, number> = {};
+      for (const paint of allPaints) {
+        brandCounts[paint.brand] = (brandCounts[paint.brand] || 0) + 1;
+      }
+      
+      const brands = Object.entries(brandCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      res.json({
+        success: true,
+        brands,
+        totalPaints: allPaints.length
+      });
+    } catch (error: any) {
+      console.error("Error fetching catalog brands:", error);
+      res.status(500).json({ success: false, message: "Failed to fetch brands" });
+    }
+  });
+
+  app.get("/api/catalog/types", async (req, res) => {
+    try {
+      const { brand } = req.query;
+      
+      let allPaints = await db.select().from(paintCatalog);
+      
+      if (brand && typeof brand === 'string') {
+        allPaints = allPaints.filter(p => p.brand === brand);
+      }
+      
+      const typeCounts: Record<string, number> = {};
+      for (const paint of allPaints) {
+        typeCounts[paint.type] = (typeCounts[paint.type] || 0) + 1;
+      }
+      
+      const types = Object.entries(typeCounts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      res.json({
+        success: true,
+        types
+      });
+    } catch (error: any) {
+      console.error("Error fetching catalog types:", error);
+      res.status(500).json({ success: false, message: "Failed to fetch types" });
+    }
+  });
+
+  app.get("/api/catalog/paints", async (req, res) => {
+    try {
+      const { brand, type, search, limit = "100", offset = "0" } = req.query;
+      
+      let allPaints = await db.select().from(paintCatalog);
+      
+      if (brand && typeof brand === 'string') {
+        allPaints = allPaints.filter(p => p.brand === brand);
+      }
+      
+      if (type && typeof type === 'string') {
+        allPaints = allPaints.filter(p => p.type === type);
+      }
+      
+      if (search && typeof search === 'string') {
+        const searchLower = search.toLowerCase();
+        allPaints = allPaints.filter(p => 
+          p.name.toLowerCase().includes(searchLower) ||
+          p.brand.toLowerCase().includes(searchLower) ||
+          p.type.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      const total = allPaints.length;
+      const limitNum = Math.min(parseInt(limit as string) || 100, 500);
+      const offsetNum = parseInt(offset as string) || 0;
+      
+      const paginatedPaints = allPaints.slice(offsetNum, offsetNum + limitNum);
+      
+      res.json({
+        success: true,
+        paints: paginatedPaints,
+        total,
+        limit: limitNum,
+        offset: offsetNum
+      });
+    } catch (error: any) {
+      console.error("Error fetching catalog paints:", error);
+      res.status(500).json({ success: false, message: "Failed to fetch paints" });
+    }
+  });
+
+  app.post("/api/catalog/import", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user?.isAdmin) {
+        return res.status(403).json({ success: false, message: "Admin access required" });
+      }
+      
+      console.log("Starting paint catalog import...");
+      const result = await importAllPaints();
+      
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Imported ${result.count} paints from ${result.brands.length} brands`
+          : "Failed to import paints",
+        count: result.count,
+        brands: result.brands
+      });
+    } catch (error: any) {
+      console.error("Error importing paint catalog:", error);
+      res.status(500).json({ success: false, message: "Failed to import paint catalog" });
+    }
+  });
+
+  app.get("/api/catalog/stats", async (req, res) => {
+    try {
+      const stats = await getCatalogStats();
+      res.json({
+        success: true,
+        ...stats
+      });
+    } catch (error: any) {
+      console.error("Error fetching catalog stats:", error);
+      res.status(500).json({ success: false, message: "Failed to fetch catalog stats" });
+    }
+  });
+
+  app.post("/api/catalog/add-to-inventory", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { catalogPaintId, quantity = 100 } = req.body;
+      
+      if (!catalogPaintId) {
+        return res.status(400).json({ success: false, message: "Catalog paint ID is required" });
+      }
+      
+      const catalogPaints = await db.select().from(paintCatalog).where(eq(paintCatalog.id, catalogPaintId));
+      const catalogPaint = catalogPaints[0];
+      
+      if (!catalogPaint) {
+        return res.status(404).json({ success: false, message: "Paint not found in catalog" });
+      }
+      
+      const newPaint = await storage.createPaint({
+        name: catalogPaint.name,
+        brand: catalogPaint.brand,
+        color: catalogPaint.hexColor,
+        type: catalogPaint.type,
+        quantity: quantity,
+        status: "in_stock",
+        isWishlist: false,
+        userId
+      });
+      
+      res.json({
+        success: true,
+        paint: newPaint,
+        message: `Added ${catalogPaint.name} to your inventory`
+      });
+    } catch (error: any) {
+      console.error("Error adding catalog paint to inventory:", error);
+      res.status(500).json({ success: false, message: "Failed to add paint to inventory" });
     }
   });
 
