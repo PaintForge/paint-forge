@@ -59,7 +59,7 @@ export default function Landing() {
           </div>
           
           <p className="text-xl md:text-2xl text-white white-text-shadow mb-8 leading-relaxed">
-            Mange your paint collection and minature painting projects.
+            Manage your paint collection and miniature painting projects.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-3">
