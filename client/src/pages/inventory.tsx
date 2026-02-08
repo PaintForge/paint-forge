@@ -16,7 +16,7 @@ import { queryClient, apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPaintSchema, type Paint } from "@shared/schema";
+import { insertPaintSchema, type Paint, type PaintCatalogItem } from "@shared/schema";
 import { getAuthToken } from "../hooks/useAuth";
 import type { z } from "zod";
 
@@ -36,7 +36,7 @@ export default function Inventory() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedPaints, setSelectedPaints] = useState<Set<number>>(new Set());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [searchSuggestions, setSearchSuggestions] = useState<Paint[]>([]);
+  const [searchSuggestions, setSearchSuggestions] = useState<PaintCatalogItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<"inventory" | "wishlist" | "catalog">("inventory");
@@ -87,7 +87,7 @@ export default function Inventory() {
     },
   });
 
-  // Paint suggestions search
+  // Paint suggestions search from catalog
   const searchPaintSuggestions = async (query: string, brand?: string) => {
     if (query.length < 2) {
       setSearchSuggestions([]);
@@ -95,24 +95,13 @@ export default function Inventory() {
       return;
     }
 
-    if (!isAuthenticated) {
-      setSearchSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
     setIsSearching(true);
     try {
-      const response = await apiRequest("GET", `/api/paints/search?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-      let suggestions = data.filter((paint: Paint) => !paint.userId); // Only master catalog paints
-      
-      // Filter by brand if provided
-      if (brand) {
-        suggestions = suggestions.filter((paint: Paint) => paint.brand === brand);
-      }
-      
-      setSearchSuggestions(suggestions.slice(0, 10)); // Limit to 10 suggestions
+      const params = new URLSearchParams({ search: query, limit: "10" });
+      if (brand) params.set("brand", brand);
+      const res = await fetch(`/api/catalog/paints?${params.toString()}`);
+      const data = await res.json();
+      setSearchSuggestions(data.paints || []);
       setShowSuggestions(true);
     } catch (error) {
       console.error("Failed to search paints:", error);
@@ -122,10 +111,10 @@ export default function Inventory() {
     setIsSearching(false);
   };
 
-  const selectPaintSuggestion = (paint: Paint) => {
+  const selectPaintSuggestion = (paint: PaintCatalogItem) => {
     form.setValue("name", paint.name);
     form.setValue("brand", paint.brand);
-    form.setValue("color", paint.color);
+    form.setValue("color", paint.hexColor);
     form.setValue("type", paint.type);
     setShowSuggestions(false);
     setSearchSuggestions([]);
@@ -678,68 +667,76 @@ export default function Inventory() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Paint Name</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          {...field}
-                          placeholder={form.watch("brand") ? `Enter ${form.watch("brand")} paint name...` : "Select brand first"}
-                          disabled={!form.watch("brand")}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            const selectedBrand = form.watch("brand");
-                            if (selectedBrand && isAuthenticated) {
+              <div className="relative">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paint Name</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            {...field}
+                            placeholder={form.watch("brand") ? `Enter ${form.watch("brand")} paint name...` : "Select brand first"}
+                            disabled={!form.watch("brand")}
+                            autoComplete="off"
+                            onChange={(e) => {
+                              field.onChange(e);
+                              const selectedBrand = form.watch("brand");
                               searchPaintSuggestions(e.target.value, selectedBrand);
-                            }
-                          }}
-                        />
-                        {isSearching && (
-                          <div className="absolute right-3 top-3">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
-                          </div>
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                            }}
+                            onBlur={() => {
+                              setTimeout(() => setShowSuggestions(false), 200);
+                            }}
+                            onFocus={() => {
+                              if (searchSuggestions.length > 0) setShowSuggestions(true);
+                            }}
+                          />
+                          {isSearching && (
+                            <div className="absolute right-3 top-3">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                            </div>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              {/* Paint suggestions */}
-              {showSuggestions && searchSuggestions.length > 0 && (
-                <Card className="border-orange-500/20">
-                  <CardHeader className="pb-2">
-                    <h4 className="text-sm font-medium">Suggestions from {form.watch("brand")} paints:</h4>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                {/* Paint suggestions dropdown from catalog */}
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 mt-1 rounded-md border border-orange-500/30 bg-[rgba(15,15,15,0.98)] shadow-lg">
+                    <div className="p-2 border-b border-orange-500/20">
+                      <span className="text-xs text-muted-foreground">Matching paints from catalog:</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
                       {searchSuggestions.map((paint) => (
                         <div
                           key={paint.id}
-                          className="flex items-center justify-between p-2 rounded-md hover:bg-orange-500/10 cursor-pointer text-sm"
-                          onClick={() => selectPaintSuggestion(paint)}
+                          className="flex items-center justify-between px-3 py-2 hover:bg-orange-500/10 cursor-pointer text-sm"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectPaintSuggestion(paint);
+                          }}
                         >
                           <div className="flex items-center gap-2">
                             <div 
-                              className="w-4 h-4 rounded border border-orange-500/20" 
-                              style={{ backgroundColor: paint.color }}
+                              className="w-4 h-4 rounded border border-orange-500/20 flex-shrink-0" 
+                              style={{ backgroundColor: paint.hexColor }}
                             />
                             <span className="font-medium">{paint.name}</span>
                           </div>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">
                             {paint.type}
                           </Badge>
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  </div>
+                )}
+              </div>
 
               <FormField
                 control={form.control}
