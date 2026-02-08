@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { paintCatalog } from "@shared/schema";
+import { paintCatalog } from "../shared/schema";
 
 interface ParsedPaint {
   name: string;
