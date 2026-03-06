@@ -629,44 +629,6 @@ export default function Inventory() {
                 variant: "destructive",
               });
             }} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="brand"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand</FormLabel>
-                    <Select onValueChange={(value) => {
-                      field.onChange(value);
-                      // Clear name field and suggestions when brand changes
-                      form.setValue("name", "");
-                      setSearchSuggestions([]);
-                      setShowSuggestions(false);
-                    }} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select brand first" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent position="popper" className="max-h-[200px]">
-                        <SelectItem value="AK Interactive">AK Interactive</SelectItem>
-                        <SelectItem value="Army Painter">Army Painter</SelectItem>
-                        <SelectItem value="Citadel">Citadel</SelectItem>
-                        <SelectItem value="Mr. Color">Mr. Color</SelectItem>
-                        <SelectItem value="Privateer Press">Privateer Press</SelectItem>
-                        <SelectItem value="Reaper">Reaper</SelectItem>
-                        <SelectItem value="Scale75">Scale75</SelectItem>
-                        <SelectItem value="Tamiya">Tamiya</SelectItem>
-                        <SelectItem value="Testors">Testors</SelectItem>
-                        <SelectItem value="Two Thin Coats">Two Thin Coats</SelectItem>
-                        <SelectItem value="Vallejo">Vallejo</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <div className="relative">
                 <FormField
                   control={form.control}
@@ -678,13 +640,11 @@ export default function Inventory() {
                         <div className="relative">
                           <Input
                             {...field}
-                            placeholder={form.watch("brand") ? `Enter ${form.watch("brand")} paint name...` : "Select brand first"}
-                            disabled={!form.watch("brand")}
+                            placeholder="Start typing a paint name..."
                             autoComplete="off"
                             onChange={(e) => {
                               field.onChange(e);
-                              const selectedBrand = form.watch("brand");
-                              searchPaintSuggestions(e.target.value, selectedBrand);
+                              searchPaintSuggestions(e.target.value);
                             }}
                             onBlur={() => {
                               setTimeout(() => setShowSuggestions(false), 200);
@@ -728,15 +688,56 @@ export default function Inventory() {
                             />
                             <span className="font-medium">{paint.name}</span>
                           </div>
-                          <Badge variant="outline" className="text-xs flex-shrink-0 ml-2">
-                            {paint.type}
-                          </Badge>
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                            <Badge variant="outline" className="text-xs">
+                              {paint.brand}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs text-orange-400">
+                              {paint.type}
+                            </Badge>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
+
+              <FormField
+                control={form.control}
+                name="brand"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Brand</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select brand" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent position="popper" className="max-h-[200px]">
+                        <SelectItem value="AK Interactive">AK Interactive</SelectItem>
+                        <SelectItem value="Army Painter">Army Painter</SelectItem>
+                        <SelectItem value="Citadel">Citadel</SelectItem>
+                        <SelectItem value="Green Stuff World">Green Stuff World</SelectItem>
+                        <SelectItem value="Kimera Kolors">Kimera Kolors</SelectItem>
+                        <SelectItem value="Mr. Color">Mr. Color</SelectItem>
+                        <SelectItem value="P3">P3</SelectItem>
+                        <SelectItem value="Privateer Press">Privateer Press</SelectItem>
+                        <SelectItem value="Reaper">Reaper</SelectItem>
+                        <SelectItem value="Scale75">Scale75</SelectItem>
+                        <SelectItem value="Tamiya">Tamiya</SelectItem>
+                        <SelectItem value="Testors">Testors</SelectItem>
+                        <SelectItem value="Turbo Dork">Turbo Dork</SelectItem>
+                        <SelectItem value="Two Thin Coats">Two Thin Coats</SelectItem>
+                        <SelectItem value="Vallejo">Vallejo</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
