@@ -974,7 +974,7 @@ Shared from The Paint Forge - Never forget what paints you used!`;
                           <Share2 className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end" className="w-48 bg-[rgba(15,15,15,0.98)] border-orange-500/20">
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
