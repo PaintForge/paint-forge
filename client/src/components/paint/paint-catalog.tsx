@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { ScrollArea } from "../ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 import { Search, Plus, Database, Loader2, Check, BookOpen, Filter } from "lucide-react";
 import { queryClient, apiRequest } from "../../lib/queryClient";
 import { useToast } from "../../hooks/use-toast";
@@ -32,16 +33,31 @@ interface TypeInfo {
   count: number;
 }
 
-interface PaintCatalogProps {
-  onPaintAdded?: () => void;
-  userPaintNames?: string[];
+interface UserPaint {
+  id: number;
+  name: string;
+  brand: string;
+  type: string;
+  quantity: number;
 }
 
-export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: PaintCatalogProps) {
+interface DuplicateDialog {
+  open: boolean;
+  existingPaint: UserPaint | null;
+  catalogPaint: CatalogPaint | null;
+}
+
+interface PaintCatalogProps {
+  onPaintAdded?: () => void;
+  userPaints?: UserPaint[];
+}
+
+export default function PaintCatalog({ onPaintAdded, userPaints = [] }: PaintCatalogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [addingPaintId, setAddingPaintId] = useState<number | null>(null);
+  const [duplicateDialog, setDuplicateDialog] = useState<DuplicateDialog>({ open: false, existingPaint: null, catalogPaint: null });
   const { toast } = useToast();
 
   const { data: brandsData, isLoading: brandsLoading } = useQuery<{ success: boolean; brands: BrandInfo[]; totalPaints: number }>({
@@ -97,14 +113,45 @@ export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: Pain
     },
   });
 
+  const incrementQuantityMutation = useMutation({
+    mutationFn: async ({ paintId, newQuantity }: { paintId: number; newQuantity: number }) => {
+      const response = await apiRequest("PUT", `/api/paints/${paintId}`, { quantity: newQuantity });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
+      onPaintAdded?.();
+      setDuplicateDialog({ open: false, existingPaint: null, catalogPaint: null });
+      toast({
+        title: "Quantity Updated",
+        description: "Added one more to your existing paint.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update quantity.", variant: "destructive" });
+    },
+  });
+
   const handleAddToInventory = (paint: CatalogPaint) => {
+    const existing = userPaints.find(
+      (p) => p.name.toLowerCase() === paint.name.toLowerCase() &&
+             p.brand.toLowerCase() === paint.brand.toLowerCase() &&
+             p.type.toLowerCase() === paint.type.toLowerCase()
+    );
+    if (existing) {
+      setDuplicateDialog({ open: true, existingPaint: existing, catalogPaint: paint });
+      return;
+    }
     setAddingPaintId(paint.id);
     addToInventoryMutation.mutate(paint.id);
   };
 
   const isPaintOwned = (paintName: string, paintBrand: string, paintType: string) => {
-    const normalizedKey = `${paintBrand}-${paintName}-${paintType}`.toLowerCase();
-    return userPaintNames.some(owned => owned.toLowerCase() === normalizedKey);
+    return userPaints.some(
+      (p) => p.name.toLowerCase() === paintName.toLowerCase() &&
+             p.brand.toLowerCase() === paintBrand.toLowerCase() &&
+             p.type.toLowerCase() === paintType.toLowerCase()
+    );
   };
 
   const brands = brandsData?.brands || [];
@@ -290,6 +337,46 @@ export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: Pain
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Duplicate paint confirmation dialog */}
+      <Dialog
+        open={duplicateDialog.open}
+        onOpenChange={(open) => !open && setDuplicateDialog({ open: false, existingPaint: null, catalogPaint: null })}
+      >
+        <DialogContent className="glass-morphism border-orange-500/20 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-orange-500">Already in Inventory</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              You already have <span className="text-white font-medium">{duplicateDialog.catalogPaint?.name}</span>{" "}
+              ({duplicateDialog.catalogPaint?.type}) in your inventory with a quantity of{" "}
+              <span className="text-white font-medium">{duplicateDialog.existingPaint?.quantity ?? 0}</span>.
+              Would you like to add one more?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setDuplicateDialog({ open: false, existingPaint: null, catalogPaint: null })}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-orange-500 hover:bg-orange-600 text-black"
+              disabled={incrementQuantityMutation.isPending}
+              onClick={() => {
+                if (duplicateDialog.existingPaint) {
+                  incrementQuantityMutation.mutate({
+                    paintId: duplicateDialog.existingPaint.id,
+                    newQuantity: (duplicateDialog.existingPaint.quantity ?? 0) + 1,
+                  });
+                }
+              }}
+            >
+              {incrementQuantityMutation.isPending ? "Updating..." : "Add One More"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
