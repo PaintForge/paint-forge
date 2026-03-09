@@ -412,7 +412,7 @@ export default function Inventory() {
           onPaintAdded={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
           }}
-          userPaintNames={displayPaints.map(p => `${p.brand}-${p.name}`)}
+          userPaintNames={displayPaints.map(p => `${p.brand}-${p.name}-${p.type}`)}
         />
       )}
 
