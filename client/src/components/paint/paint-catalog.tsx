@@ -102,9 +102,9 @@ export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: Pain
     addToInventoryMutation.mutate(paint.id);
   };
 
-  const isPaintOwned = (paintName: string, paintBrand: string) => {
-    const normalizedName = `${paintBrand}-${paintName}`.toLowerCase();
-    return userPaintNames.some(owned => owned.toLowerCase() === normalizedName);
+  const isPaintOwned = (paintName: string, paintBrand: string, paintType: string) => {
+    const normalizedKey = `${paintBrand}-${paintName}-${paintType}`.toLowerCase();
+    return userPaintNames.some(owned => owned.toLowerCase() === normalizedKey);
   };
 
   const brands = brandsData?.brands || [];
@@ -227,7 +227,7 @@ export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: Pain
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                 {paints.map((paint) => {
-                  const isOwned = isPaintOwned(paint.name, paint.brand);
+                  const isOwned = isPaintOwned(paint.name, paint.brand, paint.type);
                   const isAdding = addingPaintId === paint.id;
                   
                   return (
