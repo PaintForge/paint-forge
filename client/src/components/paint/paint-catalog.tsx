@@ -49,16 +49,22 @@ interface DuplicateDialog {
 
 interface PaintCatalogProps {
   onPaintAdded?: () => void;
-  userPaints?: UserPaint[];
 }
 
-export default function PaintCatalog({ onPaintAdded, userPaints = [] }: PaintCatalogProps) {
+export default function PaintCatalog({ onPaintAdded }: PaintCatalogProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [addingPaintId, setAddingPaintId] = useState<number | null>(null);
   const [duplicateDialog, setDuplicateDialog] = useState<DuplicateDialog>({ open: false, existingPaint: null, catalogPaint: null });
   const { toast } = useToast();
+
+  const { data: userInventory = [] } = useQuery<UserPaint[]>({
+    queryKey: ["/api/paints"],
+    select: (data: any) => Array.isArray(data)
+      ? data.map((p: any) => ({ id: p.id, name: p.name, brand: p.brand, type: p.type, quantity: p.quantity ?? 0 }))
+      : [],
+  });
 
   const { data: brandsData, isLoading: brandsLoading } = useQuery<{ success: boolean; brands: BrandInfo[]; totalPaints: number }>({
     queryKey: ["/api/catalog/brands"],
@@ -133,7 +139,7 @@ export default function PaintCatalog({ onPaintAdded, userPaints = [] }: PaintCat
   });
 
   const handleAddToInventory = (paint: CatalogPaint) => {
-    const existing = userPaints.find(
+    const existing = userInventory.find(
       (p) => p.name.toLowerCase() === paint.name.toLowerCase() &&
              p.brand.toLowerCase() === paint.brand.toLowerCase() &&
              p.type.toLowerCase() === paint.type.toLowerCase()
@@ -147,7 +153,7 @@ export default function PaintCatalog({ onPaintAdded, userPaints = [] }: PaintCat
   };
 
   const isPaintOwned = (paintName: string, paintBrand: string, paintType: string) => {
-    return userPaints.some(
+    return userInventory.some(
       (p) => p.name.toLowerCase() === paintName.toLowerCase() &&
              p.brand.toLowerCase() === paintBrand.toLowerCase() &&
              p.type.toLowerCase() === paintType.toLowerCase()
