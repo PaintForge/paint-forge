@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Label } from "../components/ui/label";
 import { Search, Filter, Plus, Package, Palette, Grid3X3, List, CheckCircle, Download, BarChart3, Heart, Star, ShoppingCart, BookOpen } from "lucide-react";
@@ -38,6 +38,8 @@ export default function Inventory() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<PaintCatalogItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [duplicatePaint, setDuplicatePaint] = useState<Paint | null>(null);
+  const [pendingFormData, setPendingFormData] = useState<AddPaintForm | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<"inventory" | "wishlist" | "catalog">("inventory");
   const [selectionMode, setSelectionMode] = useState(false);
@@ -165,6 +167,24 @@ export default function Inventory() {
     },
   });
 
+  const incrementQuantityMutation = useMutation({
+    mutationFn: async ({ paintId, newQuantity }: { paintId: number; newQuantity: number }) => {
+      const response = await apiRequest("PUT", `/api/paints/${paintId}`, { quantity: newQuantity });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
+      setDuplicatePaint(null);
+      setPendingFormData(null);
+      clearForm();
+      safeSetIsAddDialogOpen(false);
+      toast({ title: "Quantity Updated", description: "Added one more to your existing paint." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update quantity.", variant: "destructive" });
+    },
+  });
+
   const clearForm = () => {
     form.reset({
       name: "",
@@ -194,10 +214,25 @@ export default function Inventory() {
           </Button>
         ),
       });
-      // Force close dialog
       safeSetIsAddDialogOpen(false);
       return;
     }
+
+    // Check for duplicate (same name + brand + type, same tab)
+    const isWishlist = activeTab === "wishlist";
+    const existing = displayPaints.find(
+      (p) =>
+        p.name.toLowerCase() === data.name.toLowerCase() &&
+        p.brand.toLowerCase() === data.brand.toLowerCase() &&
+        p.type.toLowerCase() === data.type.toLowerCase() &&
+        !!p.isWishlist === isWishlist
+    );
+    if (existing) {
+      setDuplicatePaint(existing);
+      setPendingFormData(data);
+      return;
+    }
+
     addPaintMutation.mutate(data);
   };
 
@@ -412,7 +447,13 @@ export default function Inventory() {
           onPaintAdded={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
           }}
-          userPaintNames={displayPaints.map(p => `${p.brand}-${p.name}-${p.type}`)}
+          userPaints={displayPaints.map(p => ({
+            id: p.id,
+            name: p.name,
+            brand: p.brand,
+            type: p.type,
+            quantity: p.quantity ?? 0,
+          }))}
         />
       )}
 
@@ -908,6 +949,46 @@ export default function Inventory() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Duplicate paint dialog for Add Paint form */}
+      <Dialog
+        open={!!duplicatePaint}
+        onOpenChange={(open) => { if (!open) { setDuplicatePaint(null); setPendingFormData(null); } }}
+      >
+        <DialogContent className="glass-morphism border-orange-500/20 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-orange-500">Already in Inventory</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              You already have <span className="text-white font-medium">{duplicatePaint?.name}</span>{" "}
+              ({duplicatePaint?.type}) in your inventory with a quantity of{" "}
+              <span className="text-white font-medium">{duplicatePaint?.quantity ?? 0}</span>.
+              Would you like to add one more?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => { setDuplicatePaint(null); setPendingFormData(null); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-orange-500 hover:bg-orange-600 text-black"
+              disabled={incrementQuantityMutation.isPending}
+              onClick={() => {
+                if (duplicatePaint) {
+                  incrementQuantityMutation.mutate({
+                    paintId: duplicatePaint.id,
+                    newQuantity: (duplicatePaint.quantity ?? 0) + 1,
+                  });
+                }
+              }}
+            >
+              {incrementQuantityMutation.isPending ? "Updating..." : "Add One More"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
