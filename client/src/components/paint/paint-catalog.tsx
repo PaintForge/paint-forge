@@ -75,7 +75,7 @@ export default function PaintCatalog({ onPaintAdded, userPaintNames = [] }: Pain
 
   const addToInventoryMutation = useMutation({
     mutationFn: async (catalogPaintId: number) => {
-      return apiRequest("POST", "/api/catalog/add-to-inventory", { catalogPaintId, quantity: 100 });
+      return apiRequest("POST", "/api/catalog/add-to-inventory", { catalogPaintId, quantity: 1 });
     },
     onSuccess: (response: any) => {
       toast({
