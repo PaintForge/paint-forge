@@ -39,7 +39,7 @@ export default function PaintCard({ paint, isSelected = false, onSelect, showSel
   const updatePaintMutation = useMutation({
     mutationFn: async (data: UpdatePaintForm) => {
       const response = await apiRequest("PUT", `/api/paints/${paint.id}`, data);
-      return response.json();
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
@@ -83,7 +83,7 @@ export default function PaintCard({ paint, isSelected = false, onSelect, showSel
   const updateQuantityMutation = useMutation({
     mutationFn: async (newQuantity: number) => {
       const response = await apiRequest("PUT", `/api/paints/${paint.id}`, { quantity: newQuantity });
-      return response.json();
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
