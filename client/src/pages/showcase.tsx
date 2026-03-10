@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Palette, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
+import { Palette, Loader2, AlertCircle, Copy, ExternalLink } from "lucide-react";
+import { SiX, SiReddit } from "react-icons/si";
+import { useToast } from "../hooks/use-toast";
 
 interface ShowcasePaint {
   id: number;
@@ -28,8 +31,19 @@ interface ShowcaseProject {
   paints?: ShowcasePaint[];
 }
 
+function setMetaTag(property: string, content: string) {
+  let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
 export default function Showcase() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
 
   const { data: project, isLoading, error } = useQuery<ShowcaseProject>({
     queryKey: ["/api/showcase", id],
@@ -40,6 +54,59 @@ export default function Showcase() {
     },
     retry: false,
   });
+
+  useEffect(() => {
+    if (!project) return;
+    const url = window.location.href;
+    const paintCount = project.paints?.length || 0;
+    const desc = project.description
+      ? `${project.description} — ${paintCount} paint${paintCount !== 1 ? "s" : ""} used.`
+      : `${paintCount} paint${paintCount !== 1 ? "s" : ""} used. Painted miniature showcase on PaintForge.`;
+
+    document.title = `${project.name} — PaintForge`;
+    setMetaTag("og:title", `${project.name} — PaintForge`);
+    setMetaTag("og:description", desc);
+    setMetaTag("og:url", url);
+    setMetaTag("og:type", "article");
+    setMetaTag("og:site_name", "PaintForge");
+    if (project.imageUrl) {
+      setMetaTag("og:image", project.imageUrl);
+      setMetaTag("og:image:width", "1200");
+      setMetaTag("og:image:height", "630");
+    }
+    setMetaTag("twitter:card", project.imageUrl ? "summary_large_image" : "summary");
+    setMetaTag("twitter:title", `${project.name} — PaintForge`);
+    setMetaTag("twitter:description", desc);
+    if (project.imageUrl) setMetaTag("twitter:image", project.imageUrl);
+
+    return () => {
+      document.title = "PaintForge";
+    };
+  }, [project]);
+
+  const shareUrl = `${window.location.origin}/showcase/${id}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: "Link copied!", description: "Paste it anywhere — Discord, BGG, messages." });
+    } catch {
+      toast({ title: "Copy failed", variant: "destructive" });
+    }
+  };
+
+  const handleShareTwitter = () => {
+    if (!project) return;
+    const paintCount = project.paints?.length || 0;
+    const text = `Check out my painted miniature: ${project.name}${project.description ? ` — ${project.description}` : ""}. ${paintCount} paint${paintCount !== 1 ? "s" : ""} used. Tracked with PaintForge`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareReddit = () => {
+    if (!project) return;
+    const title = `${project.name}${project.description ? ` — ${project.description}` : ""} [Miniature Painting]`;
+    window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(title)}`, "_blank", "noopener,noreferrer");
+  };
 
   if (isLoading) {
     return (
@@ -56,10 +123,7 @@ export default function Showcase() {
         <h1 className="text-2xl font-bold text-white">Showcase Not Found</h1>
         <p className="text-gray-400 text-center">This showcase link may be invalid or the project has been deleted.</p>
         <Link href="/">
-          <Button className="bg-orange-500 hover:bg-orange-600 text-black">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go to PaintForge
-          </Button>
+          <Button className="bg-orange-500 hover:bg-orange-600 text-black">Go to PaintForge</Button>
         </Link>
       </div>
     );
@@ -79,7 +143,11 @@ export default function Showcase() {
         {/* Header branding */}
         <div className="flex items-center gap-2 mb-8">
           <Palette className="w-5 h-5 text-orange-500" />
-          <span className="text-orange-500 font-bold tracking-wide text-sm uppercase">PaintForge</span>
+          <Link href="/">
+            <span className="text-orange-500 font-bold tracking-wide text-sm uppercase hover:text-orange-400 cursor-pointer">
+              PaintForge
+            </span>
+          </Link>
         </div>
 
         {/* Project image */}
@@ -94,7 +162,7 @@ export default function Showcase() {
         )}
 
         {/* Project title & description */}
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-white mb-2">{project.name}</h1>
           {project.description && (
             <p className="text-gray-300 text-base leading-relaxed">{project.description}</p>
@@ -109,6 +177,40 @@ export default function Showcase() {
           </div>
         </div>
 
+        {/* Share buttons */}
+        <div className="flex flex-wrap gap-2 mb-8">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-orange-500/30 hover:bg-orange-500/10 gap-2"
+            onClick={handleCopyLink}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copy Link
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/20 hover:bg-white/10 gap-2"
+            onClick={handleShareTwitter}
+          >
+            <SiX className="w-3.5 h-3.5" />
+            Share on X
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-orange-600/40 hover:bg-orange-900/20 gap-2 text-orange-400"
+            onClick={handleShareReddit}
+          >
+            <SiReddit className="w-4 h-4" />
+            Share on Reddit
+          </Button>
+          <p className="w-full text-xs text-gray-500 mt-1">
+            Tip: Copy the link and paste it into Discord, BGG, or any forum — the image preview will appear automatically.
+          </p>
+        </div>
+
         {/* Paints used */}
         {project.paints && project.paints.length > 0 && (
           <div className="mb-10">
@@ -116,7 +218,6 @@ export default function Showcase() {
               <Palette className="w-4 h-4" />
               Paints Used ({project.paints.length})
             </h2>
-
             <div className="space-y-6">
               {Object.entries(groupedPaints).map(([partName, paints]) => (
                 <div key={partName}>
