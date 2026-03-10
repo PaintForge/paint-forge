@@ -18,6 +18,7 @@ import PrivacyPolicy from "./pages/privacy-policy";
 import TermsOfService from "./pages/terms-of-service";
 import AdminDashboard from "./pages/admin";
 import FeedbackPage from "./pages/feedback";
+import Showcase from "./pages/showcase";
 
 import Header from "./components/layout/header";
 import BottomNavigation from "./components/layout/bottom-navigation";
@@ -57,6 +58,7 @@ function Router() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/privacy-policy" component={PrivacyPolicy} />
           <Route path="/terms-of-service" component={TermsOfService} />
+          <Route path="/showcase/:id" component={Showcase} />
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -80,8 +82,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Router />
         <Toaster />
+        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );
