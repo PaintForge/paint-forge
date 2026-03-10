@@ -4,7 +4,8 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Upload, Palette, Search, Filter, Camera, Image, X, Share2, Copy, Link, Download } from "lucide-react";
+import { Plus, Upload, Palette, Search, Filter, Camera, Image, X, Share2, Copy, Link, Download, ExternalLink } from "lucide-react";
+import { SiX, SiReddit } from "react-icons/si";
 
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -456,6 +457,21 @@ export default function Projects() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleShareTwitter = (project: ProjectWithPaints) => {
+    const shareUrl = `${window.location.origin}/showcase/${project.id}`;
+    const paintCount = project.paints?.length || 0;
+    const text = `Check out my painted miniature: ${project.name}${project.description ? ` — ${project.description}` : ""}. ${paintCount} paint${paintCount !== 1 ? "s" : ""} used. Tracked with @PaintForge`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(twitterUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareReddit = (project: ProjectWithPaints) => {
+    const shareUrl = `${window.location.origin}/showcase/${project.id}`;
+    const title = `${project.name}${project.description ? ` — ${project.description}` : ""} [Miniature Painting]`;
+    const redditUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(title)}`;
+    window.open(redditUrl, "_blank", "noopener,noreferrer");
   };
 
   const handleShareImage = async (project: ProjectWithPaints) => {
@@ -1001,6 +1017,25 @@ Shared from The Paint Forge - Never forget what paints you used!`;
                         >
                           <Palette className="w-4 h-4 mr-2" />
                           Share Complete Showcase
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShareTwitter(project);
+                          }}
+                        >
+                          <SiX className="w-3.5 h-3.5 mr-2" />
+                          Share on X / Twitter
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShareReddit(project);
+                          }}
+                        >
+                          <SiReddit className="w-4 h-4 mr-2 text-orange-500" />
+                          Share on Reddit
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
