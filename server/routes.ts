@@ -1100,6 +1100,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public showcase endpoint - no auth required
+  app.get("/api/showcase/:id", async (req, res) => {
+    try {
+      const project = await storage.getProject(Number(req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: "Showcase not found" });
+      }
+      const paints = await storage.getProjectPaints(project.id);
+      res.json({ ...project, paints });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch showcase" });
+    }
+  });
+
   // Project routes
   app.get("/api/projects", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
