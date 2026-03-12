@@ -34,6 +34,8 @@ interface PaintCardProps {
 
 export default function PaintCard({ paint, isSelected = false, onSelect, showSelection = false }: PaintCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEditingQty, setIsEditingQty] = useState(false);
+  const [editQtyValue, setEditQtyValue] = useState("");
   const { toast } = useToast();
 
   const updatePaintMutation = useMutation({
@@ -199,9 +201,41 @@ export default function PaintCard({ paint, isSelected = false, onSelect, showSel
                 >
                   <Minus className="w-3 h-3" />
                 </Button>
-                <span className="text-lg font-semibold min-w-[2rem] text-center">
-                  {paint.quantity || 0}
-                </span>
+                {isEditingQty ? (
+                  <input
+                    type="number"
+                    min="0"
+                    value={editQtyValue}
+                    autoFocus
+                    className="w-12 text-center text-lg font-semibold bg-transparent border-b-2 border-orange-500 outline-none text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    onChange={(e) => setEditQtyValue(e.target.value)}
+                    onBlur={() => {
+                      const parsed = parseInt(editQtyValue, 10);
+                      if (!isNaN(parsed) && parsed >= 0 && parsed !== (paint.quantity || 0)) {
+                        updateQuantityMutation.mutate(parsed);
+                      }
+                      setIsEditingQty(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") {
+                        setEditQtyValue(String(paint.quantity || 0));
+                        setIsEditingQty(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span
+                    className="text-lg font-semibold min-w-[2rem] text-center cursor-text hover:text-orange-400 transition-colors"
+                    onClick={() => {
+                      setEditQtyValue(String(paint.quantity || 0));
+                      setIsEditingQty(true);
+                    }}
+                    title="Click to edit quantity"
+                  >
+                    {paint.quantity || 0}
+                  </span>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
