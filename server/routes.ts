@@ -9,7 +9,7 @@ import { scrapeAllCitadelPaints, scrapeKnownCitadelCategories } from "./citadel-
 import { getAllCitadelPaints, getCitadelPaintsByType, searchCitadelPaints } from "./citadel-paint-database";
 import { hashPassword, comparePassword, generateToken, requireAuth, sendVerificationEmail, type AuthenticatedRequest } from "./auth";
 import { importAllPaints, getCatalogStats } from "./paintCatalogImport";
-import { paintCatalog } from "@shared/schema";
+import { paintCatalog, paintBarcodes } from "@shared/schema";
 import { ilike, or, and } from "drizzle-orm";
 import { sendPasswordResetEmail } from "./email";
 
@@ -1059,6 +1059,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching catalog stats:", error);
       res.status(500).json({ success: false, message: "Failed to fetch catalog stats" });
+    }
+  });
+
+  // Barcode lookup — check paint_catalog.barcode field then paint_barcodes crowd-source table
+  app.get("/api/catalog/barcode/:code", async (req, res) => {
+    try {
+      const { code } = req.params;
+      if (!code || code.length < 6) {
+        return res.status(400).json({ success: false, message: "Invalid barcode" });
+      }
+
+      // 1. Check if any catalog entry has this barcode directly
+      const directMatches = await db.select().from(paintCatalog).where(eq(paintCatalog.barcode, code));
+      if (directMatches.length > 0) {
+        return res.json({ success: true, paint: directMatches[0], source: "catalog" });
+      }
+
+      // 2. Check crowd-sourced paint_barcodes table
+      const barcodeRows = await db.select().from(paintBarcodes).where(eq(paintBarcodes.barcode, code));
+      if (barcodeRows.length > 0) {
+        const catalogMatches = await db.select().from(paintCatalog).where(eq(paintCatalog.id, barcodeRows[0].catalogId));
+        if (catalogMatches.length > 0) {
+          return res.json({ success: true, paint: catalogMatches[0], source: "community", confirmedCount: barcodeRows[0].confirmedCount });
+        }
+      }
+
+      return res.status(404).json({ success: false, message: "Paint not found for this barcode" });
+    } catch (error: any) {
+      console.error("Error looking up barcode:", error);
+      res.status(500).json({ success: false, message: "Barcode lookup failed" });
+    }
+  });
+
+  // Submit a barcode → catalog paint mapping (crowd-source contribution)
+  app.post("/api/catalog/barcode", requireAuth, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { barcode, catalogId } = req.body;
+
+      if (!barcode || !catalogId) {
+        return res.status(400).json({ success: false, message: "barcode and catalogId are required" });
+      }
+
+      // Verify the catalog entry exists
+      const catalogPaints = await db.select().from(paintCatalog).where(eq(paintCatalog.id, catalogId));
+      if (catalogPaints.length === 0) {
+        return res.status(404).json({ success: false, message: "Paint not found in catalog" });
+      }
+
+      // Upsert: if barcode already exists increment confirmedCount, otherwise insert
+      const existing = await db.select().from(paintBarcodes).where(eq(paintBarcodes.barcode, barcode));
+      if (existing.length > 0) {
+        await db.update(paintBarcodes)
+          .set({ confirmedCount: existing[0].confirmedCount + 1 })
+          .where(eq(paintBarcodes.barcode, barcode));
+        return res.json({ success: true, paint: catalogPaints[0], confirmed: true, confirmedCount: existing[0].confirmedCount + 1 });
+      }
+
+      await db.insert(paintBarcodes).values({
+        barcode,
+        catalogId,
+        submittedByUserId: userId,
+        confirmedCount: 1,
+      });
+
+      return res.json({ success: true, paint: catalogPaints[0], confirmed: true, confirmedCount: 1 });
+    } catch (error: any) {
+      console.error("Error submitting barcode:", error);
+      res.status(500).json({ success: false, message: "Failed to submit barcode" });
     }
   });
 
