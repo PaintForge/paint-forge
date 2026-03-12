@@ -399,8 +399,7 @@ export default function Inventory() {
           {activeTab === "inventory" && isAuthenticated && (
             <Button
               onClick={() => setIsScannerOpen(true)}
-              variant="outline"
-              className="border-orange-500/60 text-orange-400 hover:bg-orange-500/10"
+              className="bg-orange-500/25 border border-orange-500 text-orange-300 hover:bg-orange-500/40"
               title="Scan a paint barcode"
             >
               <ScanLine className="w-4 h-4 mr-2" />
@@ -666,7 +665,32 @@ export default function Inventory() {
                 Add a new paint to your {activeTab === "wishlist" ? "wishlist" : "inventory"}.
               </p>
             </DialogHeader>
-          
+
+            {activeTab === "inventory" && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-orange-500/40 text-orange-400 hover:bg-orange-500/10 h-14 text-base font-medium gap-3"
+                  onClick={() => {
+                    safeSetIsAddDialogOpen(false);
+                    setIsScannerOpen(true);
+                  }}
+                >
+                  <ScanLine className="w-6 h-6" />
+                  Scan Barcode
+                </Button>
+                <div className="relative my-1">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-white/10" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-3 text-muted-foreground">or enter manually</span>
+                  </div>
+                </div>
+              </>
+            )}
+
           <Form {...form}>
             <form onSubmit={isAuthenticated ? form.handleSubmit(onSubmit) : (e) => { 
               e.preventDefault(); 
