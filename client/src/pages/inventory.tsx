@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { Label } from "../components/ui/label";
-import { Search, Filter, Plus, Package, Palette, Grid3X3, List, CheckCircle, Download, BarChart3, Heart, Star, ShoppingCart, BookOpen } from "lucide-react";
+import { Search, Filter, Plus, Package, Palette, Grid3X3, List, CheckCircle, Download, BarChart3, Heart, Star, ShoppingCart, BookOpen, ScanLine } from "lucide-react";
 import PaintCard from "../components/paint/paint-card";
 import PaintCatalog from "../components/paint/paint-catalog";
+import BarcodeScanner from "../components/BarcodeScanner";
 import { queryClient, apiRequest } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -43,6 +44,7 @@ export default function Inventory() {
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<"inventory" | "wishlist" | "catalog">("inventory");
   const [selectionMode, setSelectionMode] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   // Check authentication by trying to validate the token
@@ -392,6 +394,17 @@ export default function Inventory() {
             >
               <ShoppingCart className="w-4 h-4 mr-2" />
               Export Shopping List
+            </Button>
+          )}
+          {activeTab === "inventory" && isAuthenticated && (
+            <Button
+              onClick={() => setIsScannerOpen(true)}
+              variant="outline"
+              className="border-orange-500/60 text-orange-400 hover:bg-orange-500/10"
+              title="Scan a paint barcode"
+            >
+              <ScanLine className="w-4 h-4 mr-2" />
+              Scan Barcode
             </Button>
           )}
           <Button 
@@ -982,6 +995,16 @@ export default function Inventory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Barcode Scanner Overlay */}
+      {isScannerOpen && (
+        <BarcodeScanner
+          onClose={() => setIsScannerOpen(false)}
+          onPaintAdded={() => {
+            toast({ title: "Paint added to inventory!" });
+          }}
+        />
+      )}
     </div>
   );
 }
