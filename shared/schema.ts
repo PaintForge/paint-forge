@@ -159,7 +159,18 @@ export const paintCatalog = pgTable("paint_catalog", {
   r: integer("r").notNull(),
   g: integer("g").notNull(),
   b: integer("b").notNull(),
+  barcode: text("barcode").unique(),
   isDiscontinued: boolean("is_discontinued").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Community-contributed barcode → paint mappings (crowd-sourced)
+export const paintBarcodes = pgTable("paint_barcodes", {
+  id: serial("id").primaryKey(),
+  barcode: text("barcode").notNull().unique(),
+  catalogId: integer("catalog_id").references(() => paintCatalog.id, { onDelete: "cascade" }).notNull(),
+  submittedByUserId: integer("submitted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  confirmedCount: integer("confirmed_count").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -170,6 +181,15 @@ export const insertPaintCatalogSchema = createInsertSchema(paintCatalog).omit({
 
 export type PaintCatalogItem = typeof paintCatalog.$inferSelect;
 export type InsertPaintCatalogItem = z.infer<typeof insertPaintCatalogSchema>;
+
+export const insertPaintBarcodeSchema = createInsertSchema(paintBarcodes).omit({
+  id: true,
+  createdAt: true,
+  confirmedCount: true,
+});
+
+export type PaintBarcode = typeof paintBarcodes.$inferSelect;
+export type InsertPaintBarcode = z.infer<typeof insertPaintBarcodeSchema>;
 
 // Feedback table
 export const feedback = pgTable("feedback", {
