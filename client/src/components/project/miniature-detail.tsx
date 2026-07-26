@@ -231,7 +231,7 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-[rgba(15,15,15,0.98)] rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-orange-500/20">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
