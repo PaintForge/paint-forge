@@ -38,7 +38,7 @@ import { apiRequest, queryClient } from "../../lib/queryClient";
 import type { Project, Paint } from "@shared/schema";
 
 const addPaintSchema = z.object({
-  paintId: z.union([z.number().min(1), z.literal("custom")], {
+  paintId: z.union([z.number().min(1), z.string().min(1)], {
     errorMap: () => ({ message: "Please select a paint or choose custom" })
   }),
   partName: z.string().min(1, "Part name is required"),
@@ -144,16 +144,34 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
         
         const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, projectPaintData);
         return response;
+      } else if (typeof data.paintId === "string") {
+        // Catalog paint with a string ID like "vallejo-123" — create a DB record first
+        const catalogPaint = allPaints.find(p => p.id.toString() === data.paintId);
+        if (!catalogPaint) throw new Error("Selected paint not found");
+        const paintResponse = await apiRequest("POST", "/api/paints", {
+          name: catalogPaint.name,
+          brand: catalogPaint.brand,
+          color: catalogPaint.color,
+          type: catalogPaint.type,
+          status: "catalog",
+          quantity: 0
+        });
+        const paintResult = await paintResponse.json();
+        const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, {
+          paintId: paintResult.id,
+          partName: data.partName,
+          technique: data.technique,
+          usageNotes: data.usageNotes
+        });
+        return response;
       } else {
-        // Use existing paint from database
-        const projectPaintData = {
+        // Use existing numeric DB paint ID
+        const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, {
           paintId: data.paintId as number,
           partName: data.partName,
           technique: data.technique,
           usageNotes: data.usageNotes
-        };
-        
-        const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, projectPaintData);
+        });
         return response;
       }
     },
@@ -303,7 +321,7 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
                                 field.onChange("custom");
                               } else {
                                 setIsCustomPaint(false);
-                                field.onChange(Number(value));
+                                field.onChange(value);
                               }
                             }}>
                               <FormControl>
