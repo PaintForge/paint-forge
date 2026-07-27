@@ -132,7 +132,7 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
         };
         
         const paintResponse = await apiRequest("POST", "/api/paints", customPaintData);
-        const paintResult = await paintResponse.json();
+        const paintResult = paintResponse.data;
         
         // Then add it to the project
         const projectPaintData = {
@@ -156,7 +156,7 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
           status: "catalog",
           quantity: 0
         });
-        const paintResult = await paintResponse.json();
+        const paintResult = paintResponse.data;
         const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, {
           paintId: paintResult.id,
           partName: data.partName,
