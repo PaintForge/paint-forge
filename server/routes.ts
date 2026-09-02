@@ -1134,7 +1134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/catalog/add-to-inventory", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.id;
-      const { catalogPaintId, quantity = 100 } = req.body;
+      const { catalogPaintId, quantity = 1, action } = req.body;
       
       if (!catalogPaintId) {
         return res.status(400).json({ success: false, message: "Catalog paint ID is required" });
@@ -1146,13 +1146,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!catalogPaint) {
         return res.status(404).json({ success: false, message: "Paint not found in catalog" });
       }
+
+      const requestedQuantity = Number(quantity);
+      if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
+        return res.status(400).json({ success: false, message: "Quantity must be a positive whole number" });
+      }
+
+      // Barcode scans should not create duplicate rows for the same user's inventory.
+      const userPaints = await storage.getAllPaints(userId);
+      const existingPaint = userPaints.find((paint) =>
+        !paint.isWishlist &&
+        paint.name.trim().toLowerCase() === catalogPaint.name.trim().toLowerCase() &&
+        paint.brand.trim().toLowerCase() === catalogPaint.brand.trim().toLowerCase() &&
+        paint.type.trim().toLowerCase() === catalogPaint.type.trim().toLowerCase()
+      );
+
+      if (existingPaint) {
+        if (action === "discard") {
+          return res.json({
+            success: true,
+            action: "discarded",
+            paint: existingPaint,
+            message: `${catalogPaint.name} was not added`,
+          });
+        }
+
+        if (action !== "increment") {
+          return res.json({
+            success: false,
+            duplicate: true,
+            existingPaint,
+            message: `${catalogPaint.name} is already in your inventory`,
+          });
+        }
+
+        const updatedPaint = await storage.updatePaint(existingPaint.id, {
+          quantity: (existingPaint.quantity ?? 0) + requestedQuantity,
+        });
+
+        return res.json({
+          success: true,
+          action: "incremented",
+          paint: updatedPaint,
+          message: `Increased ${catalogPaint.name} to ${updatedPaint?.quantity ?? 0}`,
+        });
+      }
       
       const newPaint = await storage.createPaint({
         name: catalogPaint.name,
         brand: catalogPaint.brand,
         color: catalogPaint.hexColor,
         type: catalogPaint.type,
-        quantity: quantity,
+        quantity: requestedQuantity,
         status: "in_stock",
         isWishlist: false,
         userId
