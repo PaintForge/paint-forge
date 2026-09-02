@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Upload, Palette, Search, Filter, Camera, Image, X, Share2, Copy, Link, Download, ExternalLink } from "lucide-react";
+import { Plus, Upload, Palette, Search, Filter, Camera, Image, X, Share2, Copy, Link, Download, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { SiX, SiReddit } from "react-icons/si";
 
 import { Button } from "../components/ui/button";
@@ -28,6 +28,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -82,7 +92,10 @@ export default function Projects() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectWithPaints | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replacePhotoInputRef = useRef<HTMLInputElement>(null);
+  const replacePhotoTargetRef = useRef<ProjectWithPaints | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -159,6 +172,57 @@ export default function Projects() {
       toast({
         title: "Error",
         description: error.message || "Failed to create miniature showcase",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const replacePhotoMutation = useMutation({
+    mutationFn: async ({ project, imageUrl }: { project: ProjectWithPaints; imageUrl: string }) => {
+      return await apiRequest("PATCH", `/api/projects/${project.id}`, { imageUrl });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (selectedProject?.id === variables.project.id) {
+        setSelectedProject({ ...selectedProject, imageUrl: variables.imageUrl });
+      }
+      replacePhotoTargetRef.current = null;
+      if (replacePhotoInputRef.current) {
+        replacePhotoInputRef.current.value = "";
+      }
+      toast({
+        title: "Photo replaced",
+        description: "The project photo was updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to replace project photo",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (project: ProjectWithPaints) => {
+      return await apiRequest("DELETE", `/api/projects/${project.id}`);
+    },
+    onSuccess: (_, project) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (selectedProject?.id === project.id) {
+        setSelectedProject(null);
+      }
+      setDeleteTarget(null);
+      toast({
+        title: "Project deleted",
+        description: `"${project.name}" and its paint recipe were permanently deleted.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "Failed to delete project",
         variant: "destructive",
       });
     },
@@ -388,6 +452,49 @@ export default function Projects() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleReplacePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const project = replacePhotoTargetRef.current;
+    if (!file || !project) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (JPEG, PNG, etc.).",
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please choose an image smaller than 20MB.",
+        variant: "destructive",
+      });
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const imageUrl = await compressImage(file);
+      replacePhotoMutation.mutate({ project, imageUrl });
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error?.message || "Failed to process the image. Please try again.",
+        variant: "destructive",
+      });
+      event.target.value = "";
+    }
+  };
+
+  const startReplacingPhoto = (project: ProjectWithPaints) => {
+    replacePhotoTargetRef.current = project;
+    replacePhotoInputRef.current?.click();
   };
 
   const removeImage = () => {
@@ -939,7 +1046,15 @@ Shared from The Paint Forge - Never forget what paints you used!`;
 
       {/* Projects Grid */}
       {filteredProjects.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <>
+          <input
+            ref={replacePhotoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleReplacePhotoUpload}
+            className="hidden"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
             <Card key={project.id} className="glass-morphism hover:forge-glow transition-all group cursor-pointer" onClick={() => setSelectedProject(project)}>
               <CardHeader className="p-0">
@@ -968,6 +1083,35 @@ Shared from The Paint Forge - Never forget what paints you used!`;
                   </p>
                 )}
                 
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 border-orange-500/30 hover:bg-orange-500/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startReplacingPhoto(project);
+                    }}
+                    disabled={replacePhotoMutation.isPending}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Replace Photo
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(project);
+                    }}
+                    disabled={deleteProjectMutation.isPending}
+                    aria-label={`Delete ${project.name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+
                 {/* Paint Count Badge */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1067,7 +1211,8 @@ Shared from The Paint Forge - Never forget what paints you used!`;
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Miniature Detail Modal */}
@@ -1077,6 +1222,41 @@ Shared from The Paint Forge - Never forget what paints you used!`;
           onClose={() => setSelectedProject(null)}
         />
       )}
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deleteProjectMutation.isPending) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-cinzel text-orange-500">
+              Delete this project?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {deleteTarget ? `"${deleteTarget.name}"` : "this project"},
+              including its photo and paint recipe. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProjectMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteProjectMutation.mutate(deleteTarget);
+                }
+              }}
+              disabled={deleteProjectMutation.isPending}
+            >
+              {deleteProjectMutation.isPending ? "Deleting..." : "Delete Project"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Camera Modal - Moved outside dialog structure */}
       {isCameraOpen && (
