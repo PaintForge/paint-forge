@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { PaintCatalogItem } from "@shared/schema";
+import type { Paint, PaintCatalogItem } from "@shared/schema";
 
 interface BarcodeScannerProps {
   onClose: () => void;
   onPaintAdded?: () => void;
 }
 
-type ScanState = "scanning" | "found" | "not_found" | "adding" | "added" | "error" | "no_camera";
+type ScanState = "scanning" | "found" | "not_found" | "adding" | "duplicate" | "added" | "discarded" | "error" | "no_camera";
 
 interface BarcodeResult {
   paint: PaintCatalogItem;
@@ -33,6 +33,7 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
   const [result, setResult] = useState<BarcodeResult | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCatalogPaint, setSelectedCatalogPaint] = useState<PaintCatalogItem | null>(null);
+  const [duplicateInventoryPaint, setDuplicateInventoryPaint] = useState<Paint | null>(null);
 
   // Catalog search for manual linking
   const { data: searchResults, isFetching: searchLoading } = useQuery<PaintCatalogItem[]>({
@@ -48,16 +49,23 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
 
   // Add to inventory mutation
   const addMutation = useMutation({
-    mutationFn: async (catalogPaintId: number) => {
+    mutationFn: async ({ catalogPaintId, action }: { catalogPaintId: number; action?: "increment" | "discard" }) => {
       const response = await apiRequest("POST", "/api/catalog/add-to-inventory", {
         catalogPaintId,
         quantity: 1,
+        action,
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.duplicate) {
+        setDuplicateInventoryPaint(data.existingPaint);
+        setScanState("duplicate");
+        return;
+      }
+
       queryClient.invalidateQueries({ queryKey: ["/api/paints"] });
-      setScanState("added");
+      setScanState(data.action === "discarded" ? "discarded" : "added");
       onPaintAdded?.();
     },
     onError: (err: any) => {
@@ -188,14 +196,31 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
 
   const handleAddToInventory = (paint: PaintCatalogItem) => {
     setScanState("adding");
-    addMutation.mutate(paint.id);
+    addMutation.mutate({ catalogPaintId: paint.id });
   };
 
-  const handleLinkAndAdd = (catalogPaint: PaintCatalogItem) => {
+  const handleDuplicateChoice = (action: "increment" | "discard") => {
+    if (!result) return;
+    setScanState("adding");
+    addMutation.mutate({ catalogPaintId: result.paint.id, action });
+  };
+
+  const handleDiscardDuplicate = () => {
+    setDuplicateInventoryPaint(null);
+    setScanState("discarded");
+  };
+
+  const handleLinkAndAdd = async (catalogPaint: PaintCatalogItem) => {
     setSelectedCatalogPaint(catalogPaint);
-    submitBarcodeMutation.mutate({ barcode: scannedCode, catalogId: catalogPaint.id });
-    // Also add to inventory
-    addMutation.mutate(catalogPaint.id);
+    // Link the barcode first, then add the paint. Sequencing these prevents
+    // the link response from replacing a duplicate-inventory prompt.
+    try {
+      await submitBarcodeMutation.mutateAsync({ barcode: scannedCode, catalogId: catalogPaint.id });
+    } catch {
+      // The barcode link may fail independently; still allow the user to add
+      // the selected paint to inventory.
+    }
+    handleAddToInventory(catalogPaint);
   };
 
   return (
@@ -280,12 +305,65 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
           </div>
         )}
 
+        {/* Duplicate inventory state */}
+        {scanState === "duplicate" && result && duplicateInventoryPaint && (
+          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6">
+            <AlertCircle className="w-12 h-12 text-orange-400 mb-4" />
+            <h2 className="text-white text-xl font-bold mb-1 text-center">Already in your inventory</h2>
+            <p className="text-gray-300 text-center mb-2">
+              {result.paint.name} is already listed in your inventory.
+            </p>
+            <p className="text-orange-400 text-sm text-center mb-6">
+              Current quantity: {duplicateInventoryPaint.quantity ?? 0}
+            </p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <Button
+                className="bg-orange-500 hover:bg-orange-600 text-black font-semibold w-full"
+                onClick={() => handleDuplicateChoice("increment")}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Increase to {(duplicateInventoryPaint.quantity ?? 0) + 1}
+              </Button>
+              <Button
+                variant="outline"
+                className="border-red-500/40 text-red-300 hover:bg-red-500/10 w-full"
+                onClick={handleDiscardDuplicate}
+              >
+                Discard Scanned Paint
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Successfully added */}
         {scanState === "added" && result && (
           <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6">
             <CheckCircle2 className="w-16 h-16 text-green-500 mb-4" />
             <h2 className="text-white text-xl font-bold mb-1">{result.paint.name}</h2>
             <p className="text-gray-400 mb-6">Added to your inventory!</p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <Button
+                className="bg-orange-500 hover:bg-orange-600 text-black font-semibold w-full"
+                onClick={handleScanAgain}
+              >
+                <Scan className="w-4 h-4 mr-2" />
+                Scan Another Paint
+              </Button>
+              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Discarded duplicate state */}
+        {scanState === "discarded" && result && (
+          <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6">
+            <CheckCircle2 className="w-16 h-16 text-gray-400 mb-4" />
+            <h2 className="text-white text-xl font-bold mb-1">Scan discarded</h2>
+            <p className="text-gray-400 text-center mb-6">
+              {result.paint.name} was not added or changed in your inventory.
+            </p>
             <div className="flex flex-col gap-3 w-full max-w-xs">
               <Button
                 className="bg-orange-500 hover:bg-orange-600 text-black font-semibold w-full"
