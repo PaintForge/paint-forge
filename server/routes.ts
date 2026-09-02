@@ -1231,7 +1231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const project = await storage.updateProject(Number(req.params.id), req.body);
+      const project = await storage.updateProject(Number(req.params.id), req.body, req.user!.id);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
@@ -1243,7 +1243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/projects/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const success = await storage.deleteProject(Number(req.params.id));
+      const success = await storage.deleteProject(Number(req.params.id), req.user!.id);
       if (!success) {
         return res.status(404).json({ message: "Project not found" });
       }
