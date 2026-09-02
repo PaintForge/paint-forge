@@ -36,8 +36,8 @@ export interface IStorage {
   getAllProjects(userId: number): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
-  updateProject(id: number, project: UpdateProject): Promise<Project | undefined>;
-  deleteProject(id: number): Promise<boolean>;
+  updateProject(id: number, project: UpdateProject, userId?: number): Promise<Project | undefined>;
+  deleteProject(id: number, userId?: number): Promise<boolean>;
 
   // Project Paints
   getProjectPaints(projectId: number): Promise<ProjectPaint[]>;
@@ -234,12 +234,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateProject(id: number, updateData: UpdateProject): Promise<Project | undefined> {
+  async updateProject(id: number, updateData: UpdateProject, userId?: number): Promise<Project | undefined> {
     try {
+      const conditions = userId
+        ? and(eq(projects.id, id), eq(projects.userId, userId))
+        : eq(projects.id, id);
       const [project] = await db
         .update(projects)
         .set({ ...updateData, updatedAt: new Date() })
-        .where(eq(projects.id, id))
+        .where(conditions)
         .returning();
       return project;
     } catch (error) {
@@ -248,9 +251,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteProject(id: number): Promise<boolean> {
+  async deleteProject(id: number, userId?: number): Promise<boolean> {
     try {
-      const result = await db.delete(projects).where(eq(projects.id, id)).returning();
+      const conditions = userId
+        ? and(eq(projects.id, id), eq(projects.userId, userId))
+        : eq(projects.id, id);
+      const result = await db.delete(projects).where(conditions).returning();
       return result.length > 0;
     } catch (error) {
       console.error("Error deleting project:", error);
