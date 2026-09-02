@@ -1,5 +1,6 @@
 import { db } from "./db";
-import { paintCatalog } from "../shared/schema";
+import { paintBarcodes, paintCatalog } from "../shared/schema";
+import { eq } from "drizzle-orm";
 
 interface ParsedPaint {
   name: string;
@@ -10,191 +11,358 @@ interface ParsedPaint {
   g: number;
   b: number;
   isDiscontinued: boolean;
+  barcodes: string[];
+  hasSourceColor: boolean;
 }
 
-const GITHUB_BASE_URL = "https://raw.githubusercontent.com/Arcturus5404/miniature-paints/main/paints";
+interface WarHubManifestFile {
+  path: string;
+  kind?: string;
+  partition?: string;
+}
 
-const BRAND_FILES: Record<string, string> = {
-  "Citadel": "Citadel_Colour.md",
-  "Vallejo Game Color": "Vallejo.md",
-  "Army Painter": "Army_Painter.md",
-  "Scale75": "Scale75.md",
-  "AK Interactive": "AK.md",
-  "Reaper": "Reaper.md",
-  "P3": "P3.md",
-  "Turbo Dork": "TurboDork.md",
-  "Green Stuff World": "GreenStuffWorld.md",
-  "Kimera Kolors": "KimeraKolors.md",
-};
+interface WarHubManifest {
+  version?: string;
+  files?: WarHubManifestFile[];
+}
 
-function parseMarkdownTable(markdown: string, brandName: string): ParsedPaint[] {
-  const paints: ParsedPaint[] = [];
-  const lines = markdown.split('\n');
-  
-  let inTable = false;
-  let headerParsed = false;
-  let hasCodeColumn = false;
-  
-  for (const line of lines) {
-    if (line.startsWith('|Name|') || line.startsWith('| Name |')) {
-      inTable = true;
-      headerParsed = false;
-      hasCodeColumn = line.includes('|Code|');
-      continue;
-    }
-    
-    if (line.startsWith('|---') || line.startsWith('| ---')) {
-      headerParsed = true;
-      continue;
-    }
-    
-    if (inTable && headerParsed && line.startsWith('|')) {
-      const parts = line.split('|').filter(p => p.trim() !== '');
-      
-      const minParts = hasCodeColumn ? 7 : 6;
-      if (parts.length >= minParts) {
-        let name: string, type: string, r: number, g: number, b: number, hexCol: string;
-        
-        if (hasCodeColumn) {
-          name = parts[0]?.trim() || '';
-          type = parts[2]?.trim() || '';
-          r = parseInt(parts[3]?.trim() || '0', 10);
-          g = parseInt(parts[4]?.trim() || '0', 10);
-          b = parseInt(parts[5]?.trim() || '0', 10);
-          hexCol = parts[6] || '';
-        } else {
-          name = parts[0]?.trim() || '';
-          type = parts[1]?.trim() || '';
-          r = parseInt(parts[2]?.trim() || '0', 10);
-          g = parseInt(parts[3]?.trim() || '0', 10);
-          b = parseInt(parts[4]?.trim() || '0', 10);
-          hexCol = parts[5] || '';
-        }
-        
-        const hexMatch = hexCol.match(/#([A-Fa-f0-9]{6})/);
-        const hexColor = hexMatch ? `#${hexMatch[1]}` : `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        
-        const isDiscontinued = type.toLowerCase().includes('discontinued');
-        const cleanType = type.replace(/\s*\(discontinued\)/i, '').trim();
-        
-        if (name && !isNaN(r) && !isNaN(g) && !isNaN(b)) {
-          paints.push({
-            name,
-            brand: brandName,
-            type: cleanType || 'Unknown',
-            hexColor: hexColor.toUpperCase(),
-            r,
-            g,
-            b,
-            isDiscontinued,
-          });
-        }
-      }
-    }
+interface WarHubPaintRecord {
+  brand?: string;
+  name?: string;
+  type?: string;
+  range?: string;
+  hex?: string;
+  status?: string;
+  ean?: string | number;
+  additionalEans?: Array<string | number>;
+}
+
+interface WarHubPaintPartition {
+  partition?: {
+    label?: string;
+  };
+  paints?: WarHubPaintRecord[];
+}
+
+const WARHUB_BASE_URL = "https://warhub.github.io/warhub-catalog";
+const WARHUB_MANIFEST_URL = `${WARHUB_BASE_URL}/manifest.json`;
+
+function normalizedBrand(brand: string): string {
+  const value = brand.trim().toLowerCase().replace(/\s+/g, " ");
+  const aliases: Record<string, string> = {
+    "citadel colour": "citadel",
+    "p3 (privateer press)": "p3",
+    "vallejo game color": "vallejo",
+  };
+  return aliases[value] || value;
+}
+
+function paintKey(paint: { name: string; brand: string; type: string }): string {
+  return [
+    normalizedBrand(paint.brand),
+    paint.name,
+    paint.type,
+  ]
+    .map(value => value.trim().toLowerCase().replace(/\s+/g, " "))
+    .join("|");
+}
+
+function normalizeBarcode(value: string | number | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const barcode = String(value).trim().replace(/\D/g, "");
+  return barcode.length >= 6 ? barcode : null;
+}
+
+function parseHexColor(value: string | undefined): { hexColor: string; r: number; g: number; b: number } | null {
+  const match = value?.trim().match(/^#?([a-f0-9]{6})$/i);
+  if (!match) return null;
+
+  const hex = match[1].toUpperCase();
+  return {
+    hexColor: `#${hex}`,
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16),
+  };
+}
+
+function parseWarHubPaint(record: WarHubPaintRecord, partitionBrand: string): ParsedPaint | null {
+  const name = record.name?.trim();
+  const brand = record.brand?.trim() || partitionBrand.trim();
+  const type = record.type?.trim() || record.range?.trim() || "Unknown";
+  const sourceColor = parseHexColor(record.hex);
+  const color = sourceColor || { hexColor: "#808080", r: 128, g: 128, b: 128 };
+
+  if (!name || !brand) return null;
+
+  const barcodes = [record.ean, ...(record.additionalEans || [])]
+    .map(normalizeBarcode)
+    .filter((barcode): barcode is string => barcode !== null);
+
+  return {
+    name,
+    brand,
+    type,
+    ...color,
+    isDiscontinued: record.status?.toLowerCase() === "discontinued",
+    barcodes: [...new Set(barcodes)],
+    hasSourceColor: sourceColor !== null,
+  };
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`WarHub request failed (${response.status}): ${url}`);
   }
-  
-  return paints;
+  return response.json() as Promise<T>;
 }
 
-async function fetchBrandPaints(brandName: string, fileName: string): Promise<ParsedPaint[]> {
-  try {
-    const url = `${GITHUB_BASE_URL}/${fileName}`;
-    console.log(`Fetching ${brandName} paints from ${url}...`);
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`Failed to fetch ${brandName}: ${response.status}`);
-      return [];
-    }
-    
-    const markdown = await response.text();
-    const paints = parseMarkdownTable(markdown, brandName);
-    console.log(`Parsed ${paints.length} paints from ${brandName}`);
-    
-    return paints;
-  } catch (error) {
-    console.error(`Error fetching ${brandName}:`, error);
-    return [];
+async function fetchWarHubPaints(): Promise<{ paints: ParsedPaint[]; brands: string[]; version: string }> {
+  const manifest = await fetchJson<WarHubManifest>(WARHUB_MANIFEST_URL);
+  const partitionFiles = (manifest.files || []).filter(file =>
+    file.kind === "paint-catalog-partition" &&
+    file.path.startsWith("paints/by-brand/") &&
+    file.path.endsWith(".json")
+  );
+
+  if (partitionFiles.length === 0) {
+    throw new Error("WarHub manifest did not contain any paint partitions");
   }
-}
 
-export async function importAllPaints(forceRefresh: boolean = false): Promise<{ success: boolean; count: number; brands: string[]; message: string }> {
   const allPaints: ParsedPaint[] = [];
   const importedBrands: string[] = [];
-  
-  for (const [brandName, fileName] of Object.entries(BRAND_FILES)) {
-    const paints = await fetchBrandPaints(brandName, fileName);
+
+  for (const file of partitionFiles) {
+    const partition = await fetchJson<WarHubPaintPartition>(`${WARHUB_BASE_URL}/${file.path}`);
+    const partitionBrand = partition.partition?.label || file.partition || "Unknown";
+    const paints = (partition.paints || [])
+      .map(record => parseWarHubPaint(record, partitionBrand))
+      .filter((paint): paint is ParsedPaint => paint !== null);
+
     if (paints.length > 0) {
       allPaints.push(...paints);
-      importedBrands.push(brandName);
+      importedBrands.push(partitionBrand);
+      console.log(`Parsed ${paints.length} paints from WarHub: ${partitionBrand}`);
     }
   }
-  
-  if (allPaints.length === 0) {
-    return { success: false, count: 0, brands: [], message: "Failed to fetch any paints from source" };
+
+  return {
+    paints: allPaints,
+    brands: importedBrands,
+    version: manifest.version || "unknown",
+  };
+}
+
+export async function importAllPaints(): Promise<{
+  success: boolean;
+  count: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  barcodesAdded: number;
+  barcodesSkipped: number;
+  brands: string[];
+  message: string;
+}> {
+  let source: { paints: ParsedPaint[]; brands: string[]; version: string };
+
+  try {
+    source = await fetchWarHubPaints();
+  } catch (error) {
+    console.error("Error fetching WarHub catalog:", error);
+    return {
+      success: false,
+      count: 0,
+      added: 0,
+      updated: 0,
+      unchanged: 0,
+      barcodesAdded: 0,
+      barcodesSkipped: 0,
+      brands: [],
+      message: `WarHub sync failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
-  
+
+  if (source.paints.length === 0) {
+    return {
+      success: false,
+      count: 0,
+      added: 0,
+      updated: 0,
+      unchanged: 0,
+      barcodesAdded: 0,
+      barcodesSkipped: 0,
+      brands: [],
+      message: "WarHub returned no usable paint records",
+    };
+  }
+
   try {
     const existingPaints = await db.select().from(paintCatalog);
-    
-    if (existingPaints.length > 0 && !forceRefresh) {
-      console.log('Paint catalog already has data, skipping import');
-      return { 
-        success: true, 
-        count: existingPaints.length, 
-        brands: importedBrands,
-        message: `Catalog already contains ${existingPaints.length} paints. Use force refresh to update.`
-      };
+    const existingByKey = new Map(existingPaints.map(paint => [paintKey(paint), paint]));
+    const sourceByKey = new Map<string, ParsedPaint>();
+    const paintsToUpdate: Array<{
+      id: number;
+      paint: ParsedPaint;
+      existing: typeof existingPaints[number];
+    }> = [];
+    let added = 0;
+    let unchanged = 0;
+
+    for (const paint of source.paints) {
+      const key = paintKey(paint);
+      const priorSourcePaint = sourceByKey.get(key);
+      if (priorSourcePaint) {
+        priorSourcePaint.barcodes = [...new Set([...priorSourcePaint.barcodes, ...paint.barcodes])];
+        continue;
+      }
+      sourceByKey.set(key, paint);
+
+      const existing = existingByKey.get(key);
+      if (!existing) {
+        added++;
+        continue;
+      }
+
+      const hasChanges =
+        existing.name !== paint.name ||
+        existing.brand !== paint.brand ||
+        existing.type !== paint.type ||
+        (paint.hasSourceColor && existing.hexColor !== paint.hexColor) ||
+        (paint.hasSourceColor && existing.r !== paint.r) ||
+        (paint.hasSourceColor && existing.g !== paint.g) ||
+        (paint.hasSourceColor && existing.b !== paint.b) ||
+        existing.isDiscontinued !== paint.isDiscontinued;
+
+      if (!hasChanges) {
+        unchanged++;
+        continue;
+      }
+
+      paintsToUpdate.push({ id: existing.id, paint, existing });
     }
-    
-    if (forceRefresh && existingPaints.length > 0) {
-      console.log('Force refresh: clearing existing catalog data...');
-      await db.delete(paintCatalog);
-      console.log('Catalog cleared.');
-    }
-    
+
+    const paintsToInsert = [...sourceByKey.values()].filter(paint => !existingByKey.has(paintKey(paint)));
     const batchSize = 100;
-    let inserted = 0;
-    
-    for (let i = 0; i < allPaints.length; i += batchSize) {
-      const batch = allPaints.slice(i, i + batchSize);
-      await db.insert(paintCatalog).values(batch);
-      inserted += batch.length;
-      console.log(`Inserted ${inserted}/${allPaints.length} paints...`);
+    const updateBatchSize = 40;
+    for (let i = 0; i < paintsToUpdate.length; i += updateBatchSize) {
+      const batch = paintsToUpdate.slice(i, i + updateBatchSize);
+      await Promise.all(batch.map(({ id, paint, existing }) =>
+        // Keep barcode and createdAt untouched so existing direct and community
+        // mappings continue to point at the same catalog ID.
+        db.update(paintCatalog)
+          .set({
+            name: paint.name,
+            brand: paint.brand,
+            type: paint.type,
+            hexColor: paint.hasSourceColor ? paint.hexColor : existing.hexColor,
+            r: paint.hasSourceColor ? paint.r : existing.r,
+            g: paint.hasSourceColor ? paint.g : existing.g,
+            b: paint.hasSourceColor ? paint.b : existing.b,
+            isDiscontinued: paint.isDiscontinued,
+          })
+          .where(eq(paintCatalog.id, id))
+      ));
     }
-    
-    console.log(`Successfully imported ${inserted} paints from ${importedBrands.length} brands`);
-    return { 
-      success: true, 
-      count: inserted, 
-      brands: importedBrands,
-      message: `Successfully imported ${inserted} paints from ${importedBrands.length} brands`
+
+    const updated = paintsToUpdate.length;
+    for (let i = 0; i < paintsToInsert.length; i += batchSize) {
+      const batch = paintsToInsert.slice(i, i + batchSize)
+        .map(({ barcodes: _barcodes, hasSourceColor: _hasSourceColor, ...paint }) => paint);
+      await db.insert(paintCatalog).values(batch);
+      console.log(`Inserted ${Math.min(i + batch.length, paintsToInsert.length)}/${paintsToInsert.length} new WarHub paints...`);
+    }
+
+    // Re-read after inserts so newly created records have their catalog IDs.
+    const catalogAfterSync = await db.select().from(paintCatalog);
+    const catalogByKey = new Map(catalogAfterSync.map(paint => [paintKey(paint), paint]));
+    const existingBarcodeRows = await db.select().from(paintBarcodes);
+    const knownBarcodes = new Set(existingBarcodeRows.map(row => row.barcode));
+    const directBarcodeOwners = new Map(
+      catalogAfterSync
+        .filter(paint => paint.barcode)
+        .map(paint => [paint.barcode as string, paint.id])
+    );
+    const barcodeMappings: { barcode: string; catalogId: number }[] = [];
+    let barcodesSkipped = 0;
+
+    for (const paint of sourceByKey.values()) {
+      const catalogPaint = catalogByKey.get(paintKey(paint));
+      if (!catalogPaint) continue;
+
+      for (const barcode of paint.barcodes) {
+        const directOwner = directBarcodeOwners.get(barcode);
+        if (directOwner !== undefined && directOwner !== catalogPaint.id) {
+          barcodesSkipped++;
+          continue;
+        }
+        if (knownBarcodes.has(barcode)) {
+          barcodesSkipped++;
+          continue;
+        }
+        knownBarcodes.add(barcode);
+        barcodeMappings.push({ barcode, catalogId: catalogPaint.id });
+      }
+    }
+
+    for (let i = 0; i < barcodeMappings.length; i += batchSize) {
+      const batch = barcodeMappings.slice(i, i + batchSize);
+      await db.insert(paintBarcodes)
+        .values(batch)
+        .onConflictDoNothing({ target: paintBarcodes.barcode });
+    }
+
+    const total = existingPaints.length + added;
+    const message = `WarHub ${source.version} sync complete: ${added} added, ${updated} updated, ${unchanged} unchanged, ${barcodeMappings.length} barcode mappings added. Existing catalog entries, community mappings, and user inventory were preserved.`;
+    console.log(message);
+
+    return {
+      success: true,
+      count: total,
+      added,
+      updated,
+      unchanged,
+      barcodesAdded: barcodeMappings.length,
+      barcodesSkipped,
+      brands: source.brands,
+      message,
     };
   } catch (error) {
-    console.error('Error importing paints:', error);
-    return { success: false, count: 0, brands: [], message: `Import failed: ${error}` };
+    console.error("Error merging WarHub catalog:", error);
+    return {
+      success: false,
+      count: 0,
+      added: 0,
+      updated: 0,
+      unchanged: 0,
+      barcodesAdded: 0,
+      barcodesSkipped: 0,
+      brands: [],
+      message: `WarHub sync failed while saving: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
 export async function getCatalogStats(): Promise<{ totalPaints: number; brands: { name: string; count: number }[] }> {
   try {
     const allPaints = await db.select().from(paintCatalog);
-    
+
     const brandCounts: Record<string, number> = {};
     for (const paint of allPaints) {
       brandCounts[paint.brand] = (brandCounts[paint.brand] || 0) + 1;
     }
-    
+
     const brands = Object.entries(brandCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
-    
+
     return {
       totalPaints: allPaints.length,
       brands,
     };
   } catch (error) {
-    console.error('Error getting catalog stats:', error);
+    console.error("Error getting catalog stats:", error);
     return { totalPaints: 0, brands: [] };
   }
 }
