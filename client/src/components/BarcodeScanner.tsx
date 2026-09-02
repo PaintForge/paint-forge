@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BrowserMultiFormatReader, NotFoundException } from "@zxing/browser";
-import { X, Scan, CheckCircle2, AlertCircle, Search, Plus, Loader2, Camera, Users } from "lucide-react";
+import { BrowserMultiFormatReader, type IScannerControls } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
+import { X, Scan, CheckCircle2, AlertCircle, Search, Plus, Loader2, Camera, Users, Flashlight, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +23,32 @@ interface BarcodeResult {
   confirmedCount?: number;
 }
 
+interface NativeDetectedBarcode {
+  rawValue: string;
+}
+
+interface NativeBarcodeDetector {
+  detect(source: CanvasImageSource): Promise<NativeDetectedBarcode[]>;
+}
+
+interface NativeBarcodeDetectorConstructor {
+  new(options?: { formats?: string[] }): NativeBarcodeDetector;
+  getSupportedFormats?: () => Promise<string[]>;
+}
+
+interface ExtendedTrackCapabilities extends MediaTrackCapabilities {
+  torch?: boolean;
+  zoom?: { min: number; max: number; step?: number };
+  focusMode?: string[];
+  exposureMode?: string[];
+  whiteBalanceMode?: string[];
+}
+
 export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const nativeScanTimerRef = useRef<number | null>(null);
   const scanningRef = useRef(true);
   const { toast } = useToast();
 
@@ -34,6 +58,10 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCatalogPaint, setSelectedCatalogPaint] = useState<PaintCatalogItem | null>(null);
   const [duplicateInventoryPaint, setDuplicateInventoryPaint] = useState<Paint | null>(null);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null);
+  const [zoomValue, setZoomValue] = useState(1);
 
   // Catalog search for manual linking
   const { data: searchResults, isFetching: searchLoading } = useQuery<PaintCatalogItem[]>({
@@ -109,89 +137,209 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
     }
   }, []);
 
-  useEffect(() => {
-    const reader = new BrowserMultiFormatReader();
-    readerRef.current = reader;
+  const stopScanner = useCallback(() => {
+    scanningRef.current = false;
+    if (nativeScanTimerRef.current !== null) {
+      window.clearTimeout(nativeScanTimerRef.current);
+      nativeScanTimerRef.current = null;
+    }
+    controlsRef.current?.stop();
+    controlsRef.current = null;
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    try {
+      BrowserMultiFormatReader.releaseAllStreams();
+    } catch {}
+  }, []);
 
-    const startScanning = async () => {
+  const configureCameraTrack = useCallback(async (track: MediaStreamTrack) => {
+    const capabilities = track.getCapabilities?.() as ExtendedTrackCapabilities | undefined;
+    const settings = track.getSettings?.();
+    if (!capabilities) return;
+
+    const advanced: Record<string, unknown> = {};
+    if (capabilities.focusMode?.includes("continuous")) advanced.focusMode = "continuous";
+    if (capabilities.exposureMode?.includes("continuous")) advanced.exposureMode = "continuous";
+    if (capabilities.whiteBalanceMode?.includes("continuous")) advanced.whiteBalanceMode = "continuous";
+
+    if (Object.keys(advanced).length > 0) {
       try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        if (devices.length === 0) {
-          setScanState("no_camera");
-          return;
-        }
+        await track.applyConstraints({ advanced: [advanced] } as MediaTrackConstraints);
+      } catch {
+        // Optional camera enhancements vary by browser and device.
+      }
+    }
 
-        // Prefer rear camera on mobile
-        const backCamera = devices.find(d =>
-          d.label.toLowerCase().includes("back") ||
-          d.label.toLowerCase().includes("rear") ||
-          d.label.toLowerCase().includes("environment")
-        ) || devices[devices.length - 1];
+    setTorchAvailable(Boolean(capabilities.torch));
+    if (capabilities.zoom && capabilities.zoom.max > capabilities.zoom.min) {
+      const currentZoom = typeof settings?.zoom === "number" ? settings.zoom : capabilities.zoom.min;
+      setZoomRange({
+        min: capabilities.zoom.min,
+        max: capabilities.zoom.max,
+        step: capabilities.zoom.step || 0.1,
+      });
+      setZoomValue(currentZoom);
+    } else {
+      setZoomRange(null);
+    }
+  }, []);
 
-        await reader.decodeFromVideoDevice(
-          backCamera.deviceId,
-          videoRef.current!,
-          (result, error) => {
-            if (!scanningRef.current) return;
-            if (result) {
-              const code = result.getText();
-              scanningRef.current = false;
-              setScannedCode(code);
-              setScanState("scanning"); // keep as scanning briefly before lookup
-              lookupBarcode(code);
-            }
+  const handleDetectedCode = useCallback((code: string) => {
+    if (!scanningRef.current || !code) return;
+    stopScanner();
+    setScannedCode(code);
+    setScanState("scanning");
+    lookupBarcode(code);
+  }, [lookupBarcode, stopScanner]);
+
+  const startScanning = useCallback(async () => {
+    stopScanner();
+    scanningRef.current = true;
+    setTorchAvailable(false);
+    setTorchOn(false);
+    setZoomRange(null);
+
+    const video = videoRef.current;
+    if (!video || !navigator.mediaDevices?.getUserMedia) {
+      setScanState("no_camera");
+      return;
+    }
+
+    const constraints: MediaStreamConstraints = {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30, max: 30 },
+      },
+    };
+
+    try {
+      const detectorConstructor = (window as unknown as {
+        BarcodeDetector?: NativeBarcodeDetectorConstructor;
+      }).BarcodeDetector;
+
+      if (detectorConstructor) {
+        try {
+          const desiredFormats = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+          const supportedFormats = detectorConstructor.getSupportedFormats
+            ? await detectorConstructor.getSupportedFormats()
+            : desiredFormats;
+          const formats = desiredFormats.filter(format => supportedFormats.includes(format));
+
+          if (formats.length > 0) {
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            streamRef.current = stream;
+            video.srcObject = stream;
+            await video.play();
+            await configureCameraTrack(stream.getVideoTracks()[0]);
+
+            const detector = new detectorConstructor({ formats });
+            const scanFrame = async () => {
+              if (!scanningRef.current) return;
+              if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+                nativeScanTimerRef.current = window.setTimeout(scanFrame, 100);
+                return;
+              }
+              try {
+                const detections = await detector.detect(video);
+                if (detections[0]?.rawValue) {
+                  handleDetectedCode(detections[0].rawValue);
+                  return;
+                }
+              } catch {
+                // A transient frame decode error should not stop scanning.
+              }
+              if (scanningRef.current) {
+                nativeScanTimerRef.current = window.setTimeout(scanFrame, 100);
+              }
+            };
+            scanFrame();
+            return;
           }
-        );
-      } catch (err: any) {
-        if (err?.name === "NotAllowedError") {
-          setScanState("no_camera");
-        } else {
-          setScanState("error");
+        } catch (nativeError: any) {
+          streamRef.current?.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+          if (nativeError?.name === "NotAllowedError") throw nativeError;
         }
       }
-    };
 
+      const hints = new Map<DecodeHintType, unknown>();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+
+      const reader = new BrowserMultiFormatReader(hints, {
+        delayBetweenScanAttempts: 75,
+        delayBetweenScanSuccess: 500,
+      });
+      controlsRef.current = await reader.decodeFromConstraints(
+        constraints,
+        video,
+        result => {
+          if (result) handleDetectedCode(result.getText());
+        }
+      );
+
+      const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+      streamRef.current = stream;
+      const track = stream?.getVideoTracks()[0];
+      if (track) await configureCameraTrack(track);
+    } catch (err: any) {
+      stopScanner();
+      if (err?.name === "NotAllowedError") {
+        setScanState("no_camera");
+      } else {
+        setScanState("error");
+      }
+    }
+  }, [configureCameraTrack, handleDetectedCode, stopScanner]);
+
+  useEffect(() => {
     startScanning();
-
-    return () => {
-      scanningRef.current = false;
-      try {
-        BrowserMultiFormatReader.releaseAllStreams();
-      } catch {}
-    };
-  }, [lookupBarcode]);
+    return stopScanner;
+  }, [startScanning, stopScanner]);
 
   const handleScanAgain = () => {
     setScannedCode("");
     setResult(null);
     setSelectedCatalogPaint(null);
     setSearchQuery("");
-    scanningRef.current = true;
     setScanState("scanning");
-
-    // Re-init scanner
-    const reader = new BrowserMultiFormatReader();
-    readerRef.current = reader;
-    const startScanning = async () => {
-      try {
-        const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-        if (devices.length === 0) { setScanState("no_camera"); return; }
-        const backCamera = devices.find(d =>
-          d.label.toLowerCase().includes("back") ||
-          d.label.toLowerCase().includes("rear")
-        ) || devices[devices.length - 1];
-        await reader.decodeFromVideoDevice(backCamera.deviceId, videoRef.current!, (res) => {
-          if (!scanningRef.current) return;
-          if (res) {
-            const code = res.getText();
-            scanningRef.current = false;
-            setScannedCode(code);
-            lookupBarcode(code);
-          }
-        });
-      } catch { setScanState("error"); }
-    };
     startScanning();
+  };
+
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const nextValue = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: nextValue } as MediaTrackConstraintSet],
+      });
+      setTorchOn(nextValue);
+    } catch {
+      setTorchAvailable(false);
+    }
+  };
+
+  const changeZoom = async (value: number) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    setZoomValue(value);
+    try {
+      await track.applyConstraints({
+        advanced: [{ zoom: value } as MediaTrackConstraintSet],
+      });
+    } catch {
+      setZoomRange(null);
+    }
   };
 
   const handleAddToInventory = (paint: PaintCatalogItem) => {
@@ -242,6 +390,8 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
           ref={videoRef}
           className="w-full h-full object-cover"
           style={{ display: scanState === "scanning" ? "block" : "none" }}
+          playsInline
+          muted
         />
 
         {/* Scanning overlay */}
@@ -258,8 +408,42 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
               <div className="absolute inset-x-0 h-0.5 bg-orange-500/80 animate-scan-line" />
             </div>
             <p className="mt-6 text-white/70 text-sm bg-black/60 px-4 py-2 rounded-full">
-              Point at the barcode on the paint pot
+              Hold the barcode horizontally and move slowly
             </p>
+          </div>
+        )}
+
+        {scanState === "scanning" && (torchAvailable || zoomRange) && (
+          <div className="absolute inset-x-4 bottom-4 flex items-center justify-center gap-3">
+            {torchAvailable && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={toggleTorch}
+                className={torchOn
+                  ? "bg-orange-500 hover:bg-orange-600 text-black"
+                  : "bg-black/70 hover:bg-black/90 text-white border border-white/20"}
+              >
+                <Flashlight className="w-4 h-4 mr-2" />
+                {torchOn ? "Light On" : "Turn On Light"}
+              </Button>
+            )}
+            {zoomRange && (
+              <div className="flex items-center gap-2 rounded-md border border-white/20 bg-black/70 px-3 py-2">
+                <ZoomIn className="w-4 h-4 text-white" />
+                <input
+                  type="range"
+                  aria-label="Camera zoom"
+                  min={zoomRange.min}
+                  max={zoomRange.max}
+                  step={zoomRange.step}
+                  value={zoomValue}
+                  onChange={event => changeZoom(Number(event.target.value))}
+                  className="w-24 accent-orange-500"
+                />
+                <span className="w-8 text-right text-xs text-white">{zoomValue.toFixed(1)}×</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -481,7 +665,7 @@ export default function BarcodeScanner({ onClose, onPaintAdded }: BarcodeScanner
       {scanState === "scanning" && (
         <div className="p-4 bg-black/80 border-t border-white/10 flex-shrink-0 text-center">
           <p className="text-xs text-gray-500">
-            Supports EAN-13, UPC-A, and QR codes · Works best in good lighting
+            Supports EAN-13, EAN-8, UPC-A, UPC-E, and Code 128 · Avoid glare and fill the frame
           </p>
         </div>
       )}
