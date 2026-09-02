@@ -510,15 +510,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
       
-      const { forceRefresh = false } = req.body;
-      console.log(`[ADMIN] Paint catalog import requested by ${user.email}, forceRefresh: ${forceRefresh}`);
+       console.log(`[ADMIN] Non-destructive paint catalog sync requested by ${user.email}`);
       
-      const result = await importAllPaints(forceRefresh);
+       const result = await importAllPaints();
       
       res.json({
         success: result.success,
         message: result.message,
         count: result.count,
+         added: result.added,
+         updated: result.updated,
+         unchanged: result.unchanged,
+         barcodesAdded: result.barcodesAdded,
+         barcodesSkipped: result.barcodesSkipped,
         brands: result.brands,
       });
     } catch (error: any) {
@@ -1038,9 +1042,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: result.success,
         message: result.success 
-          ? `Imported ${result.count} paints from ${result.brands.length} brands`
+           ? result.message
           : "Failed to import paints",
         count: result.count,
+         added: result.added,
+         updated: result.updated,
+         unchanged: result.unchanged,
+         barcodesAdded: result.barcodesAdded,
+         barcodesSkipped: result.barcodesSkipped,
         brands: result.brands
       });
     } catch (error: any) {
