@@ -29,7 +29,10 @@ import {
 import { 
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
@@ -75,6 +78,14 @@ interface ProjectPaint {
   };
 }
 
+interface CatalogPaintOption {
+  id: string;
+  name: string;
+  brand: string;
+  color: string;
+  type: string;
+}
+
 interface MiniatureDetailProps {
   project: Project;
   onClose: () => void;
@@ -114,7 +125,11 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
     queryKey: [`/api/projects/${project.id}/paints`],
   });
 
-  const { data: allPaints = [] } = useQuery<Paint[]>({
+  const { data: inventoryPaints = [] } = useQuery<Paint[]>({
+    queryKey: ["/api/paints"],
+  });
+
+  const { data: catalogPaints = [] } = useQuery<CatalogPaintOption[]>({
     queryKey: ["/api/paints/all"],
   });
 
@@ -144,9 +159,11 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
         
         const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, projectPaintData);
         return response;
-      } else if (typeof data.paintId === "string") {
-        // Catalog paint with a string ID like "vallejo-123" — create a DB record first
-        const catalogPaint = allPaints.find(p => p.id.toString() === data.paintId);
+      } else if (typeof data.paintId === "string" && data.paintId.startsWith("catalog:")) {
+        // Catalog paints are not personal inventory records yet, so create an owned
+        // record before linking the paint to the project.
+        const catalogId = data.paintId.slice("catalog:".length);
+        const catalogPaint = catalogPaints.find(p => p.id === catalogId);
         if (!catalogPaint) throw new Error("Selected paint not found");
         const paintResponse = await apiRequest("POST", "/api/paints", {
           name: catalogPaint.name,
@@ -165,9 +182,10 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
         });
         return response;
       } else {
-        // Use existing numeric DB paint ID
+        // Use the selected personal inventory record directly. This keeps the
+        // project connected to the paint the user already owns.
         const response = await apiRequest("POST", `/api/projects/${project.id}/paints`, {
-          paintId: data.paintId as number,
+          paintId: Number(data.paintId),
           partName: data.partName,
           technique: data.technique,
           usageNotes: data.usageNotes
@@ -314,38 +332,79 @@ export default function MiniatureDetail({ project, onClose }: MiniatureDetailPro
                         name="paintId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Paint</FormLabel>
-                            <Select onValueChange={(value) => {
-                              if (value === "custom") {
-                                setIsCustomPaint(true);
-                                field.onChange("custom");
-                              } else {
-                                setIsCustomPaint(false);
-                                field.onChange(value);
-                              }
-                            }}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a paint" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="custom" className="font-semibold text-orange-500">
-                                  🎨 Add Custom Paint
-                                </SelectItem>
-                                {allPaints.map((paint) => (
-                                  <SelectItem key={paint.id} value={paint.id.toString()}>
-                                    {paint.brand} - {paint.name}
-                                    <span 
-                                      className="inline-block w-3 h-3 rounded ml-2 border border-gray-300" 
-                                      style={{ backgroundColor: paint.color }}
-                                      title={paint.color}
-                                    />
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
+                              <FormLabel>Paint</FormLabel>
+                              <Select
+                                value={field.value ? String(field.value) : ""}
+                                onValueChange={(value) => {
+                                  if (value === "custom") {
+                                    setIsCustomPaint(true);
+                                    field.onChange("custom");
+                                  } else if (value.startsWith("catalog:")) {
+                                    setIsCustomPaint(false);
+                                    field.onChange(value);
+                                  } else {
+                                    setIsCustomPaint(false);
+                                    field.onChange(Number(value));
+                                  }
+                                }}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a paint" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {inventoryPaints.length > 0 ? (
+                                    <SelectGroup>
+                                      <SelectLabel className="text-orange-500">
+                                        My Inventory ({inventoryPaints.length})
+                                      </SelectLabel>
+                                      {inventoryPaints.map((paint) => (
+                                        <SelectItem key={paint.id} value={paint.id.toString()}>
+                                          <span className="inline-flex items-center gap-2">
+                                            <span
+                                              className="inline-block w-3 h-3 rounded-full border border-gray-300"
+                                              style={{ backgroundColor: paint.color }}
+                                              title={paint.color}
+                                            />
+                                            <span>{paint.brand} - {paint.name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              ({paint.quantity ?? 0}%)
+                                            </span>
+                                          </span>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  ) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                                      Your inventory is empty. Add paints from Inventory to reuse them here.
+                                    </div>
+                                  )}
+                                  <SelectSeparator />
+                                  <SelectGroup>
+                                    <SelectLabel>More Options</SelectLabel>
+                                    <SelectItem value="custom" className="font-semibold text-orange-500">
+                                      🎨 Add Custom Paint
+                                    </SelectItem>
+                                    {catalogPaints.map((paint) => (
+                                      <SelectItem key={paint.id} value={`catalog:${paint.id}`}>
+                                        <span className="inline-flex items-center gap-2">
+                                          <span
+                                            className="inline-block w-3 h-3 rounded-full border border-gray-300"
+                                            style={{ backgroundColor: paint.color }}
+                                            title={paint.color}
+                                          />
+                                          <span>{paint.brand} - {paint.name}</span>
+                                        </span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Choose a paint from your inventory to link the existing record to this project.
+                              </p>
+                              <FormMessage />
                           </FormItem>
                         )}
                       />
