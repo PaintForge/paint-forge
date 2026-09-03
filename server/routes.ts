@@ -1321,7 +1321,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/projects/:id/paints", requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const projectId = Number(req.params.id);
-      const { paintId, partName, technique, usageNotes } = req.body;
+      const paintId = Number(req.body.paintId);
+      const { partName, technique, usageNotes } = req.body;
+
+      if (!Number.isInteger(projectId) || !Number.isInteger(paintId)) {
+        return res.status(400).json({ message: "A valid project and paint are required" });
+      }
+
+      const project = await storage.getProject(projectId);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const paint = await storage.getPaint(paintId);
+      if (!paint || paint.userId !== req.user!.id) {
+        return res.status(404).json({ message: "Paint not found in your inventory" });
+      }
+
       const projectPaint = await storage.addPaintToProject({
         projectId,
         paintId,
